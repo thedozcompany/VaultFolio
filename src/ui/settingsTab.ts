@@ -45,6 +45,19 @@ export class VaultFolioSettingsTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Output folder")
+      .setDesc("Vault folder where the generated site files will be written.")
+      .addText((text) =>
+        text
+          .setPlaceholder("_site")
+          .setValue(this.plugin.settings.outputFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.outputFolder = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Theme")
       .setDesc("Visual theme for the generated site.")
       .addDropdown((drop) =>

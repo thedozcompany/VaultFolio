@@ -130,7 +130,7 @@ export class VaultFolioSidebarView extends ItemView {
       buildBtn.setText("Building…");
       try {
         const result = await this.plugin.buildSite();
-        new Notice(`VaultFolio: built ${result.pageCount} page(s).`);
+        new Notice(`Site built. ${result.pageCount} page${result.pageCount === 1 ? "" : "s"} generated.`);
       } catch (err) {
         new Notice(`VaultFolio build error: ${err instanceof Error ? err.message : String(err)}`);
       } finally {

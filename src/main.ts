@@ -77,7 +77,22 @@ export default class VaultFolioPlugin extends Plugin {
       this.settings.portfolioFolder
     );
     const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path));
-    return buildSite(siteNotes, this.settings.siteName);
+    const result = buildSite(siteNotes, this.settings.siteName);
+
+    const outputBase = this.settings.outputFolder.replace(/\/+$/, "");
+    const adapter = this.app.vault.adapter;
+
+    for (const dir of [outputBase, `${outputBase}/pages`]) {
+      if (!(await adapter.exists(dir))) {
+        await adapter.mkdir(dir);
+      }
+    }
+
+    for (const file of result.files) {
+      await adapter.write(`${outputBase}/${file.path}`, file.content);
+    }
+
+    return result;
   }
 
   async deploy(): Promise<DeployResult> {
