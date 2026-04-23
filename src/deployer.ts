@@ -1,9 +1,7 @@
-import { SiteFile } from "./builder";
-
 export interface DeployConfig {
   githubToken: string;
-  githubRepo: string;   // "owner/repo"
-  githubBranch?: string; // defaults to "gh-pages"
+  githubRepo: string;
+  githubBranch?: string;
 }
 
 export interface DeployResult {
@@ -12,117 +10,243 @@ export interface DeployResult {
   url?: string;
 }
 
-/**
- * Deploys generated site files to a GitHub Pages branch via the GitHub Contents API.
- * Each file is created/updated individually using base64-encoded content.
- */
+interface TreeEntry {
+  path: string;
+  mode: "100644";
+  type: "blob";
+  sha: string;
+}
+
+// ── Public entry point ────────────────────────────────────────────────────────
+
 export async function deploySite(
-  files: SiteFile[],
+  files: Map<string, string>,
   config: DeployConfig
 ): Promise<DeployResult> {
-  if (!config.githubToken || !config.githubRepo) {
-    return { success: false, message: "GitHub token and repository are required." };
+  if (!config.githubToken) {
+    return { success: false, message: "GitHub token is required. Add it in VaultFolio settings." };
+  }
+  if (!config.githubRepo) {
+    return { success: false, message: "GitHub repository is required (format: owner/repo)." };
   }
 
-  const [owner, repo] = config.githubRepo.split("/");
-  if (!owner || !repo) {
-    return { success: false, message: "Repository must be in owner/repo format." };
+  const parts = config.githubRepo.split("/");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return {
+      success: false,
+      message: "Repository must be in owner/repo format (e.g. username/my-portfolio).",
+    };
   }
 
+  const [owner, repo] = parts;
   const branch = config.githubBranch ?? "gh-pages";
 
   try {
-    await ensureBranchExists(owner, repo, branch, config.githubToken);
+    // Step 1: resolve branch to its current commit + tree SHA
+    const { commitSha, treeSha } = await getOrCreateBranch(owner, repo, branch, config.githubToken);
 
-    for (const file of files) {
-      await upsertFile(owner, repo, branch, file, config.githubToken);
+    // Step 2: upload each file as a blob
+    const entries: TreeEntry[] = [];
+    for (const [path, content] of files) {
+      const sha = await createBlob(owner, repo, content, config.githubToken);
+      entries.push({ path, mode: "100644", type: "blob", sha });
     }
+
+    // Step 3: create a new tree containing all blobs
+    const newTreeSha = await createTree(owner, repo, treeSha, entries, config.githubToken);
+
+    // Step 4: create a commit pointing to the new tree
+    const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
+    const newCommitSha = await createCommit(
+      owner,
+      repo,
+      `VaultFolio deploy — ${timestamp}`,
+      newTreeSha,
+      commitSha,
+      config.githubToken
+    );
+
+    // Step 5: fast-forward the branch ref to the new commit
+    await updateRef(owner, repo, branch, newCommitSha, config.githubToken);
 
     const url = `https://${owner}.github.io/${repo}/`;
-    return { success: true, message: `Deployed ${files.length} files.`, url };
+    return {
+      success: true,
+      message: `Deployed ${files.size} file(s). View at ${url}`,
+      url,
+    };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { success: false, message: `Deploy failed: ${message}` };
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
-async function ensureBranchExists(
+// ── Git object helpers ────────────────────────────────────────────────────────
+
+async function getOrCreateBranch(
   owner: string,
   repo: string,
   branch: string,
   token: string
-): Promise<void> {
-  const branchUrl = `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`;
-  const res = await githubFetch(branchUrl, token);
+): Promise<{ commitSha: string; treeSha: string }> {
+  const refRes = await ghFetch("GET", `/repos/${owner}/${repo}/git/refs/heads/${branch}`, token);
 
-  if (res.status === 404) {
-    // Create branch from the default branch HEAD
-    const defaultRef = await githubFetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/main`,
+  if (refRes.ok) {
+    const ref = (await refRes.json()) as { object: { sha: string } };
+    const commitSha = ref.object.sha;
+    const commit = await ghJson<{ tree: { sha: string } }>(
+      "GET",
+      `/repos/${owner}/${repo}/git/commits/${commitSha}`,
       token
     );
-    if (!defaultRef.ok) {
-      throw new Error("Could not find default branch to base gh-pages on.");
-    }
-    const refData = await defaultRef.json();
-    const sha: string = refData.object.sha;
-
-    const createRes = await githubFetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/refs`,
-      token,
-      "POST",
-      { ref: `refs/heads/${branch}`, sha }
-    );
-    if (!createRes.ok) {
-      throw new Error(`Failed to create branch: ${createRes.statusText}`);
-    }
+    return { commitSha, treeSha: commit.tree.sha };
   }
+
+  if (refRes.status !== 404) {
+    throw await buildApiError(refRes, "checking branch");
+  }
+
+  // Branch doesn't exist — base it on main or master
+  const baseSha = await findDefaultBranchSha(owner, repo, token);
+
+  const createRes = await ghFetch("POST", `/repos/${owner}/${repo}/git/refs`, token, {
+    ref: `refs/heads/${branch}`,
+    sha: baseSha,
+  });
+  if (!createRes.ok) throw await buildApiError(createRes, "creating branch");
+
+  const commit = await ghJson<{ tree: { sha: string } }>(
+    "GET",
+    `/repos/${owner}/${repo}/git/commits/${baseSha}`,
+    token
+  );
+  return { commitSha: baseSha, treeSha: commit.tree.sha };
 }
 
-async function upsertFile(
+async function findDefaultBranchSha(owner: string, repo: string, token: string): Promise<string> {
+  for (const name of ["main", "master"]) {
+    const res = await ghFetch("GET", `/repos/${owner}/${repo}/git/refs/heads/${name}`, token);
+    if (res.ok) {
+      const data = (await res.json()) as { object: { sha: string } };
+      return data.object.sha;
+    }
+  }
+  throw new Error(
+    "Could not find main or master branch. Push an initial commit to the repo first."
+  );
+}
+
+async function createBlob(
+  owner: string,
+  repo: string,
+  content: string,
+  token: string
+): Promise<string> {
+  const data = await ghJson<{ sha: string }>(
+    "POST",
+    `/repos/${owner}/${repo}/git/blobs`,
+    token,
+    { content, encoding: "utf-8" }
+  );
+  return data.sha;
+}
+
+async function createTree(
+  owner: string,
+  repo: string,
+  baseTreeSha: string,
+  entries: TreeEntry[],
+  token: string
+): Promise<string> {
+  const data = await ghJson<{ sha: string }>(
+    "POST",
+    `/repos/${owner}/${repo}/git/trees`,
+    token,
+    { base_tree: baseTreeSha, tree: entries }
+  );
+  return data.sha;
+}
+
+async function createCommit(
+  owner: string,
+  repo: string,
+  message: string,
+  treeSha: string,
+  parentSha: string,
+  token: string
+): Promise<string> {
+  const data = await ghJson<{ sha: string }>(
+    "POST",
+    `/repos/${owner}/${repo}/git/commits`,
+    token,
+    { message, tree: treeSha, parents: [parentSha] }
+  );
+  return data.sha;
+}
+
+async function updateRef(
   owner: string,
   repo: string,
   branch: string,
-  file: SiteFile,
+  commitSha: string,
   token: string
 ): Promise<void> {
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`;
-
-  // Check if file exists to get its SHA (required for updates)
-  let sha: string | undefined;
-  const existing = await githubFetch(apiUrl + `?ref=${branch}`, token);
-  if (existing.ok) {
-    const data = await existing.json();
-    sha = data.sha;
-  }
-
-  const encoded = btoa(unescape(encodeURIComponent(file.content)));
-  const body: Record<string, string> = {
-    message: `VaultFolio: update ${file.path}`,
-    content: encoded,
-    branch,
-  };
-  if (sha) body.sha = sha;
-
-  const res = await githubFetch(apiUrl, token, "PUT", body);
-  if (!res.ok) {
-    throw new Error(`Failed to upload ${file.path}: ${res.statusText}`);
-  }
+  const res = await ghFetch(
+    "PATCH",
+    `/repos/${owner}/${repo}/git/refs/heads/${branch}`,
+    token,
+    { sha: commitSha, force: true }
+  );
+  if (!res.ok) throw await buildApiError(res, "updating branch ref");
 }
 
-function githubFetch(
-  url: string,
+// ── Fetch utilities ───────────────────────────────────────────────────────────
+
+function ghFetch(
+  method: string,
+  path: string,
   token: string,
-  method = "GET",
   body?: unknown
 ): Promise<Response> {
-  return fetch(url, {
+  return fetch(`https://api.github.com${path}`, {
     method,
     headers: {
-      Authorization: `token ${token}`,
-      Accept: "application/vnd.github.v3+json",
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
       "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+}
+
+async function ghJson<T>(
+  method: string,
+  path: string,
+  token: string,
+  body?: unknown
+): Promise<T> {
+  const res = await ghFetch(method, path, token, body);
+  if (!res.ok) throw await buildApiError(res, `${method} ${path}`);
+  return res.json() as Promise<T>;
+}
+
+async function buildApiError(res: Response, context: string): Promise<Error> {
+  let detail = res.statusText;
+  try {
+    const body = (await res.json()) as { message?: string };
+    if (body.message) detail = body.message;
+  } catch { /* ignore parse errors */ }
+
+  if (res.status === 401) {
+    return new Error("Invalid GitHub token. Check your token in VaultFolio settings.");
+  }
+  if (res.status === 404) {
+    return new Error(
+      `Not found while ${context}. Check the repository name and token permissions.`
+    );
+  }
+  return new Error(`GitHub API error ${res.status} (${context}): ${detail}`);
 }

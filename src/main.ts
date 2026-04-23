@@ -2,7 +2,7 @@ import { Notice, Plugin } from "obsidian";
 
 import { VaultFolioSettings, DEFAULT_SETTINGS } from "./settings";
 import { Parser, getPublishedNotes, parseNote } from "./parser";
-import { buildSite, BuildResult } from "./builder";
+import { buildSite, BuildResult, SiteFile } from "./builder";
 import { deploySite, DeployResult } from "./deployer";
 import { VaultFolioSettingsTab } from "./ui/settingsTab";
 import { VaultFolioSidebarView, SIDEBAR_VIEW_TYPE } from "./ui/sidebarView";
@@ -95,13 +95,17 @@ export default class VaultFolioPlugin extends Plugin {
     return result;
   }
 
-  async deploy(): Promise<DeployResult> {
-    const buildResult = await this.buildSite();
-
-    return deploySite(buildResult.files, {
+  async deployFiles(files: SiteFile[]): Promise<DeployResult> {
+    const filesMap = new Map<string, string>(files.map((f) => [f.path, f.content]));
+    return deploySite(filesMap, {
       githubToken: this.settings.githubToken,
       githubRepo: this.settings.githubRepo,
     });
+  }
+
+  async deploy(): Promise<DeployResult> {
+    const buildResult = await this.buildSite();
+    return this.deployFiles(buildResult.files);
   }
 
   // ── Settings ──────────────────────────────────────────────────────────────

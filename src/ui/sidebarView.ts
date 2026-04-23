@@ -141,12 +141,22 @@ export class VaultFolioSidebarView extends ItemView {
 
     deployBtn.addEventListener("click", async () => {
       deployBtn.disabled = true;
-      deployBtn.setText("Deploying…");
       try {
-        const result = await this.plugin.deploy();
-        new Notice(`VaultFolio: ${result.message}`);
+        deployBtn.setText("Building…");
+        new Notice("Building site…");
+        const buildResult = await this.plugin.buildSite();
+
+        deployBtn.setText("Deploying…");
+        new Notice("Deploying to GitHub…");
+        const result = await this.plugin.deployFiles(buildResult.files);
+
+        if (result.success) {
+          new Notice(`Deployed! View at ${result.url ?? result.message}`);
+        } else {
+          new Notice(`Deploy failed: ${result.message}`);
+        }
       } catch (err) {
-        new Notice(`VaultFolio deploy error: ${err instanceof Error ? err.message : String(err)}`);
+        new Notice(`VaultFolio error: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         deployBtn.disabled = false;
         deployBtn.setText("Deploy to GitHub");
