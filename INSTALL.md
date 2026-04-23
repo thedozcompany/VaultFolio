@@ -96,11 +96,13 @@ This lets VaultFolio publish to your GitHub.
 2. Create a new note inside it
 3. Add this at the very top:
 
+'''
 ---
 title: My First Project
 published: true
 tags: [design, web]
 ---
+'''
 
 Write your project description here.
 What did you build? What problem did it solve?
@@ -116,6 +118,7 @@ What did you build? What problem did it solve?
 3. Left sidebar → Pages
 4. Under Branch → select gh-pages
 5. Click Save
+<img width="1200" height="745" alt="image" src="https://github.com/user-attachments/assets/f2ee6835-8586-4cd8-a8cb-18dc93d81f2f" />
 
 ---
 
