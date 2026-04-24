@@ -11,110 +11,226 @@ export interface BuildResult {
   imageMap: Map<string, string>; // deployPath ("images/x.png") → vault path
 }
 
-// ── Theme constants ───────────────────────────────────────────────────────────
+// ── Card palette (Apple product colors) ──────────────────────────────────────
 
-const CARD_COLORS = ["#FF4D00", "#FFE500", "#C8FF00", "#0A0A0A"];
-const CARD_TEXT   = ["#FFFFFF", "#0A0A0A", "#0A0A0A", "#FFFFFF"];
+const CARD_COLORS = ["#0071E3", "#1D1D1F", "#34C759", "#FF9F0A", "#5E5CE6", "#FF375F"];
 
-// ── Base CSS (no external framework) ─────────────────────────────────────────
+// ── Base CSS ──────────────────────────────────────────────────────────────────
 
 const BASE_CSS = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #F5F4EF; color: #0A0A0A; font-family: 'DM Sans', sans-serif; line-height: 1.6; }
-a { color: inherit; }
+body {
+  background: #FFFFFF;
+  color: #1D1D1F;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding-top: 52px;
+}
+a { color: inherit; text-decoration: none; }
 img { max-width: 100%; height: auto; display: block; }
-h1, h2, h3, h4, h5, h6 { font-family: 'Syne', sans-serif; font-weight: 800; line-height: 1.1; }
 
-/* ── Nav ── */
-.vf-nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; background: #F5F4EF; border-bottom: 2px solid #0A0A0A; }
-.vf-nav-name { font-family: 'Syne', sans-serif; font-size: 1.15rem; font-weight: 800; text-decoration: none; color: #0A0A0A; }
-.vf-nav-links { display: flex; align-items: center; gap: 1.5rem; }
-.vf-nav-link { font-weight: 600; font-size: 0.9rem; text-decoration: none; color: #0A0A0A; }
-.vf-nav-link:hover { text-decoration: underline; }
-.vf-hire-btn { background: #0A0A0A; color: #F5F4EF !important; padding: 0.45rem 1.1rem; border: 2px solid #0A0A0A; box-shadow: 4px 4px 0px #0A0A0A; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.875rem; text-decoration: none; display: inline-block; transition: transform 0.15s ease, box-shadow 0.15s ease; }
-.vf-hire-btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0px #0A0A0A; }
+/* ── Navigation ── */
+.vf-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 0.5px solid #E0E0E0;
+}
+.vf-nav-logo { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; color: #1D1D1F; }
+.vf-nav-links { display: flex; gap: 28px; }
+.vf-nav-link { font-size: 14px; color: #1D1D1F; opacity: 0.8; transition: opacity 0.2s; }
+.vf-nav-link:hover { opacity: 1; }
 
 /* ── Hero ── */
-.vf-hero { padding: 4rem 2rem; max-width: 1200px; margin: 0 auto; }
-.vf-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: #FF4D00; color: #fff; padding: 0.28rem 0.75rem; border: 2px solid #0A0A0A; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
-.vf-hero-title { font-size: clamp(2.5rem, 8vw, 6rem); font-weight: 800; line-height: 1; margin: 1rem 0; text-transform: uppercase; letter-spacing: -0.02em; }
-.vf-hero-bio { font-size: 1.05rem; color: #555; max-width: 540px; line-height: 1.7; }
-.vf-stats { display: flex; gap: 3rem; margin-top: 2.5rem; flex-wrap: wrap; }
-.vf-stat-num { font-family: 'Syne', sans-serif; font-size: 3.5rem; font-weight: 800; line-height: 1; }
-.vf-stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: #777; margin-top: 0.25rem; }
-
-/* ── Marquee ── */
-.vf-marquee-wrap { overflow: hidden; border-top: 2px solid #0A0A0A; background: #FF4D00; padding: 0.65rem 0; }
-@keyframes vf-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.vf-marquee { display: inline-flex; white-space: nowrap; animation: vf-scroll 30s linear infinite; }
-.vf-marquee-item { margin-right: 2.5rem; font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #fff; }
+.vf-hero { padding: 120px 40px 100px; text-align: center; }
+.vf-hero-inner { max-width: 800px; margin: 0 auto; }
+.vf-hero-label {
+  display: block; margin-bottom: 16px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #0071E3;
+}
+.vf-hero-title {
+  font-size: clamp(48px, 8vw, 96px);
+  font-weight: 700;
+  letter-spacing: -3px;
+  line-height: 1;
+  color: #1D1D1F;
+  margin-bottom: 20px;
+}
+.vf-hero-subtitle {
+  font-size: 21px;
+  color: #6E6E73;
+  line-height: 1.48;
+  max-width: 600px;
+  margin: 0 auto 40px;
+  font-weight: 400;
+}
+.vf-hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.vf-btn-primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 12px 28px;
+  background: #0071E3; color: #fff;
+  border: none; border-radius: 980px;
+  font-size: 15px; font-weight: 400; font-family: inherit;
+  transition: background 0.2s ease; cursor: pointer;
+}
+.vf-btn-primary:hover { background: #0077ED; color: #fff; }
+.vf-btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 12px 28px;
+  background: transparent; color: #0071E3;
+  border: 1px solid #0071E3; border-radius: 980px;
+  font-size: 15px; font-weight: 400; font-family: inherit;
+  transition: all 0.2s ease; cursor: pointer;
+}
+.vf-btn-secondary:hover { background: #0071E3; color: #fff; }
 
 /* ── Section ── */
-.vf-section { padding: 3rem 2rem; max-width: 1200px; margin: 0 auto; }
-.vf-section-title { font-size: 2rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #0A0A0A; }
+.vf-section { padding: 100px 40px; max-width: 1200px; margin: 0 auto; }
+.vf-section-label {
+  display: block; margin-bottom: 32px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #6E6E73;
+}
 
-/* ── Cards ── */
-.vf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 1.5rem; }
-.vf-card { border: 2px solid #0A0A0A; box-shadow: 4px 4px 0px #0A0A0A; text-decoration: none; color: #0A0A0A; display: flex; flex-direction: column; transition: transform 0.15s ease, box-shadow 0.15s ease; }
-.vf-card:hover { transform: translate(-3px, -3px); box-shadow: 7px 7px 0px #0A0A0A; }
-.vf-card-header { padding: 1.5rem; border-bottom: 2px solid #0A0A0A; }
-.vf-card-title { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; line-height: 1.2; }
-.vf-card-body { padding: 1.25rem; background: #F5F4EF; flex: 1; display: flex; flex-direction: column; }
-.vf-card-desc { color: #555; font-size: 0.9rem; line-height: 1.65; flex: 1; }
-.vf-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.875rem; border-top: 1px solid #ddd; }
-.vf-card-year { font-size: 0.78rem; font-weight: 600; color: #999; letter-spacing: 0.06em; }
-.vf-arrow { background: #0A0A0A; color: #F5F4EF; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+/* ── Card grid ── */
+.vf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.vf-card { display: block; text-decoration: none; color: #1D1D1F; }
+.vf-card-image {
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform 0.4s ease;
+  display: flex; align-items: center; justify-content: center;
+}
+.vf-card:hover .vf-card-image { transform: scale(1.02); }
+.vf-card-info { padding: 16px 4px 0; }
+.vf-card-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.vf-card-name { font-size: 19px; font-weight: 600; letter-spacing: -0.3px; color: #1D1D1F; }
+.vf-card-year { font-size: 14px; color: #6E6E73; flex-shrink: 0; padding-top: 3px; }
+.vf-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.vf-card-tag { font-size: 12px; color: #6E6E73; padding: 4px 10px; background: #F5F5F7; border-radius: 980px; }
 
-/* ── Tags ── */
-.vf-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
-.vf-tag { font-size: 0.68rem; font-weight: 700; padding: 0.18rem 0.55rem; border: 1.5px solid #0A0A0A; text-transform: uppercase; letter-spacing: 0.06em; }
+/* ── About strip ── */
+.vf-about { background: #1D1D1F; padding: 100px 40px; }
+.vf-about-inner { max-width: 1200px; margin: 0 auto; }
+.vf-about-label {
+  display: block; margin-bottom: 32px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #6E6E73;
+}
+.vf-about-text {
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 700;
+  color: #F5F5F7;
+  line-height: 1.2;
+  letter-spacing: -1px;
+  max-width: 820px;
+  margin-bottom: 48px;
+}
+.vf-skills { display: flex; flex-wrap: wrap; gap: 10px; }
+.vf-skill {
+  font-size: 14px; color: #8E8E93;
+  padding: 8px 18px;
+  border: 0.5px solid #3A3A3C;
+  border-radius: 980px;
+}
 
 /* ── Footer ── */
-.vf-footer { background: #0A0A0A; color: #F5F4EF; padding: 1.75rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-top: 2px solid #0A0A0A; }
-.vf-footer-name { font-family: 'Syne', sans-serif; font-weight: 700; }
-.vf-footer-credit { font-size: 0.825rem; opacity: 0.5; }
-.vf-footer-links { display: flex; gap: 1.5rem; }
-.vf-footer-link { color: #F5F4EF; text-decoration: none; font-size: 0.875rem; opacity: 0.7; }
-.vf-footer-link:hover { opacity: 1; text-decoration: underline; }
+.vf-footer {
+  background: #F5F5F7;
+  border-top: 0.5px solid #D2D2D7;
+  padding: 40px;
+  text-align: center;
+}
+.vf-footer-text { font-size: 12px; color: #6E6E73; line-height: 1.6; }
+.vf-footer-text a { color: #0071E3; }
+.vf-footer-name { font-weight: 600; color: #1D1D1F; }
 
-/* ── Project page ── */
-.vf-project-header { padding: 3rem 2rem; border-bottom: 2px solid #0A0A0A; }
-.vf-project-inner { max-width: 1200px; margin: 0 auto; }
-.vf-project-title { font-size: clamp(2rem, 5vw, 3.75rem); font-weight: 800; line-height: 1.05; text-transform: uppercase; letter-spacing: -0.02em; }
-.vf-back-btn { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.15); color: #fff !important; padding: 0.4rem 0.9rem; border: 2px solid #fff; font-weight: 700; font-size: 0.825rem; text-decoration: none; margin-bottom: 1.5rem; transition: background 0.15s ease; }
-.vf-back-btn:hover { background: rgba(255,255,255,0.3); }
+/* ── Back button ── */
+.vf-back-wrap { max-width: 1200px; margin: 0 auto; padding: 32px 40px 0; }
+.vf-back-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 15px; color: #0071E3;
+  padding: 8px 16px 8px 10px;
+  border-radius: 980px;
+  background: rgba(0,113,227,0.08);
+  transition: background 0.2s ease;
+  font-weight: 400;
+}
+.vf-back-btn:hover { background: rgba(0,113,227,0.15); color: #0071E3; }
+
+/* ── Project hero ── */
+.vf-project-hero-wrap { max-width: 1200px; margin: 28px auto 0; padding: 0 40px; }
+.vf-project-hero {
+  border-radius: 18px; overflow: hidden;
+  aspect-ratio: 21 / 9;
+  display: flex; align-items: center; justify-content: center;
+}
+.vf-project-hero-title {
+  font-size: clamp(32px, 5vw, 64px);
+  font-weight: 700; color: #fff;
+  letter-spacing: -2px; line-height: 1.1;
+  text-align: center; padding: 2rem;
+}
+
+/* ── Project meta ── */
+.vf-project-meta { max-width: 680px; margin: 0 auto; padding: 48px 40px 0; }
+.vf-project-title {
+  font-size: 48px; font-weight: 700;
+  letter-spacing: -1.5px; line-height: 1.1;
+  color: #1D1D1F; margin-bottom: 12px;
+}
+.vf-project-date { font-size: 14px; color: #6E6E73; margin-top: 12px; }
+.vf-project-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.vf-project-tag {
+  font-size: 13px; color: #fff;
+  background: #0071E3;
+  padding: 5px 14px; border-radius: 980px;
+}
 
 /* ── Prose ── */
-.vf-prose { max-width: 720px; padding: 3rem 2rem; margin: 0 auto; }
-.vf-prose h1 { font-size: 2rem; margin: 2rem 0 0.75rem; }
-.vf-prose h2 { font-size: 1.625rem; margin: 2rem 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #0A0A0A; }
-.vf-prose h3 { font-size: 1.25rem; margin: 1.75rem 0 0.6rem; }
-.vf-prose h4, .vf-prose h5, .vf-prose h6 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; }
-.vf-prose p { margin: 1rem 0; color: #333; line-height: 1.8; }
-.vf-prose a { color: #FF4D00; text-decoration: underline; font-weight: 500; }
-.vf-prose a:hover { color: #cc3d00; }
-.vf-prose strong { font-weight: 700; color: #0A0A0A; }
+.vf-prose { max-width: 680px; margin: 0 auto; padding: 60px 40px 100px; }
+.vf-prose h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; margin: 2.5rem 0 1rem; }
+.vf-prose h2 { font-size: 28px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2; margin: 2.5rem 0 1rem; }
+.vf-prose h3 { font-size: 22px; font-weight: 600; line-height: 1.3; margin: 2rem 0 0.8rem; }
+.vf-prose h4, .vf-prose h5, .vf-prose h6 { font-size: 17px; font-weight: 600; margin: 1.5rem 0 0.6rem; }
+.vf-prose p { font-size: 17px; line-height: 1.8; color: #3A3A3C; margin: 1.2rem 0; }
+.vf-prose a { color: #0071E3; }
+.vf-prose a:hover { text-decoration: underline; }
+.vf-prose strong { font-weight: 600; color: #1D1D1F; }
 .vf-prose em { font-style: italic; }
 .vf-prose ul { list-style: disc; padding-left: 1.5rem; margin: 1rem 0; }
 .vf-prose ol { list-style: decimal; padding-left: 1.5rem; margin: 1rem 0; }
-.vf-prose li { margin: 0.4rem 0; line-height: 1.75; color: #333; }
-.vf-prose code { background: #0A0A0A; color: #F5F4EF; padding: 0.15rem 0.4rem; font-size: 0.875em; font-family: 'Courier New', monospace; }
-.vf-prose pre { background: #0A0A0A; color: #F5F4EF; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; border: 2px solid #0A0A0A; box-shadow: 4px 4px 0px rgba(10,10,10,0.25); }
-.vf-prose pre code { background: none; padding: 0; }
-.vf-prose blockquote { border-left: 4px solid #FF4D00; padding: 0.5rem 0 0.5rem 1rem; color: #555; font-style: italic; margin: 1.5rem 0; background: #fff; }
-.vf-prose hr { border: none; border-top: 2px solid #0A0A0A; margin: 2.5rem 0; }
-.vf-prose img { border: 2px solid #0A0A0A; box-shadow: 4px 4px 0px #0A0A0A; margin: 1.5rem 0; }
+.vf-prose li { font-size: 17px; line-height: 1.8; color: #3A3A3C; margin: 0.4rem 0; }
+.vf-prose code { background: #F5F5F7; color: #1D1D1F; padding: 2px 6px; border-radius: 4px; font-size: 0.875em; font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', monospace; }
+.vf-prose pre { background: #1D1D1F; color: #F5F5F7; padding: 24px; border-radius: 12px; overflow-x: auto; margin: 2rem 0; }
+.vf-prose pre code { background: none; padding: 0; color: inherit; }
+.vf-prose blockquote { border-left: 2px solid #0071E3; padding: 4px 0 4px 20px; color: #6E6E73; font-style: italic; margin: 1.5rem 0; }
+.vf-prose hr { border: none; border-top: 0.5px solid #D2D2D7; margin: 3rem 0; }
+.vf-prose img { border-radius: 12px; margin: 2rem 0; }
 
 /* ── Responsive ── */
-@media (max-width: 640px) {
-  .vf-nav { padding: 0.75rem 1rem; }
-  .vf-nav-links { gap: 0.75rem; }
-  .vf-hero, .vf-section { padding: 2rem 1rem; }
-  .vf-project-header, .vf-prose { padding: 2rem 1rem; }
-  .vf-stat-num { font-size: 2.5rem; }
-  .vf-stats { gap: 1.5rem; }
-  .vf-footer { padding: 1.5rem 1rem; flex-direction: column; text-align: center; }
-  .vf-footer-links { justify-content: center; }
+@media (max-width: 768px) {
+  .vf-nav { padding: 0 20px; }
+  .vf-nav-links { display: none; }
+  .vf-hero { padding: 80px 20px 60px; }
+  .vf-hero-title { letter-spacing: -1.5px; }
+  .vf-hero-subtitle { font-size: 17px; }
+  .vf-section { padding: 60px 20px; }
+  .vf-grid { grid-template-columns: 1fr; }
+  .vf-about { padding: 60px 20px; }
+  .vf-footer { padding: 32px 20px; }
+  .vf-back-wrap { padding: 20px 20px 0; }
+  .vf-project-hero-wrap { padding: 0 20px; }
+  .vf-project-meta { padding: 32px 20px 0; }
+  .vf-project-title { font-size: 32px; letter-spacing: -1px; }
+  .vf-prose { padding: 40px 20px 60px; }
 }
 `.trim();
 
@@ -124,31 +240,26 @@ function htmlHead(pageTitle: string): string {
   return `  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${pageTitle}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <style>${BASE_CSS}</style>`;
 }
 
 function renderNav(siteName: string, root = ""): string {
   return `<nav class="vf-nav">
-  <a href="${root}index.html" class="vf-nav-name">${escapeHtml(siteName)}</a>
+  <a href="${root}index.html" class="vf-nav-logo">${escapeHtml(siteName)}</a>
   <div class="vf-nav-links">
     <a href="${root}index.html#work" class="vf-nav-link">Work</a>
     <a href="${root}index.html#about" class="vf-nav-link">About</a>
-    <a href="mailto:" class="vf-hire-btn">Hire&nbsp;me</a>
+    <a href="mailto:" class="vf-nav-link">Contact</a>
   </div>
 </nav>`;
 }
 
-function renderFooter(siteName: string, root = ""): string {
+function renderFooter(siteName: string): string {
   return `<footer class="vf-footer">
-  <span class="vf-footer-name">${escapeHtml(siteName)}</span>
-  <span class="vf-footer-credit">Built with VaultFolio</span>
-  <div class="vf-footer-links">
-    <a href="${root}index.html#work" class="vf-footer-link">Work</a>
-    <a href="${root}index.html#about" class="vf-footer-link">About</a>
-  </div>
+  <p class="vf-footer-text">
+    <span class="vf-footer-name">${escapeHtml(siteName)}</span>
+    &nbsp;·&nbsp; Built with <a href="#">VaultFolio</a>
+  </p>
 </footer>`;
 }
 
@@ -163,46 +274,37 @@ export function buildSite(notes: ParsedNote[], siteTitle: string): BuildResult {
 // ── Index page ────────────────────────────────────────────────────────────────
 
 function buildIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
-  // Marquee ticker — all unique tags, duplicated for seamless loop
-  const allTags = collectTags(notes);
-  const tickerItems = (allTags.length > 0 ? allTags : ["PORTFOLIO", "WORK", "PROJECTS", "DESIGN", "CODE"])
-    .map((t) => `<span class="vf-marquee-item">★&nbsp;${escapeHtml(t.toUpperCase())}</span>`)
-    .join("");
-  const marquee = tickerItems + tickerItems;
-
   // Project cards
   const cards = notes
     .map((n, i) => {
-      const bg   = CARD_COLORS[i % CARD_COLORS.length];
-      const fg   = CARD_TEXT[i % CARD_TEXT.length];
+      const bg    = CARD_COLORS[i % CARD_COLORS.length];
       const title = (n.frontmatter.title as string | undefined) ?? n.slug;
       const tags  = Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [];
-      const rawDesc = n.body
-        .replace(/!\[\[[^\]]+\]\]/g, "")
-        .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
-        .replace(/<[^>]*>/g, "")
-        .trim();
-      const desc = rawDesc.slice(0, 150) + (rawDesc.length > 150 ? "…" : "");
-      const year = extractYear(n.frontmatter.date as string | undefined);
+      const year  = extractYear(n.frontmatter.date as string | undefined);
       const tagChips = tags
-        .map((t) => `<span class="vf-tag" style="color:${fg};border-color:${fg}">${escapeHtml(t)}</span>`)
+        .map((t) => `<span class="vf-card-tag">${escapeHtml(t)}</span>`)
         .join("");
 
       return `<a href="pages/${n.slug}.html" class="vf-card">
-  <div class="vf-card-header" style="background:${bg};color:${fg}">
-    <div class="vf-card-title">${escapeHtml(title)}</div>
-    ${tags.length > 0 ? `<div class="vf-tags">${tagChips}</div>` : ""}
-  </div>
-  <div class="vf-card-body">
-    ${desc ? `<p class="vf-card-desc">${escapeHtml(desc)}</p>` : ""}
-    <div class="vf-card-foot">
+  <div class="vf-card-image" style="background:${bg}"></div>
+  <div class="vf-card-info">
+    <div class="vf-card-row">
+      <span class="vf-card-name">${escapeHtml(title)}</span>
       <span class="vf-card-year">${escapeHtml(year)}</span>
-      <span class="vf-arrow">→</span>
     </div>
+    ${tags.length > 0 ? `<div class="vf-card-tags">${tagChips}</div>` : ""}
   </div>
 </a>`;
     })
     .join("\n");
+
+  // About strip skills (collected from all tags)
+  const allTags = collectTags(notes);
+  const defaultSkills = ["Design", "Development", "Strategy", "UX", "React", "TypeScript"];
+  const skills = allTags.length > 0 ? allTags : defaultSkills;
+  const skillChips = skills
+    .map((s) => `<span class="vf-skill">${escapeHtml(s)}</span>`)
+    .join("");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -213,32 +315,34 @@ ${htmlHead(escapeHtml(siteTitle))}
 
 ${renderNav(siteTitle)}
 
-<div style="border-bottom:2px solid #0A0A0A">
-  <section class="vf-hero">
-    <div class="vf-badge">● AVAILABLE FOR WORK</div>
+<!-- Hero -->
+<section class="vf-hero">
+  <div class="vf-hero-inner">
+    <span class="vf-hero-label">Available for work</span>
     <h1 class="vf-hero-title">${escapeHtml(siteTitle)}</h1>
-    <p class="vf-hero-bio">Crafting digital experiences — one project at a time.</p>
-    <div class="vf-stats">
-      <div>
-        <div class="vf-stat-num">${String(notes.length).padStart(2, "0")}</div>
-        <div class="vf-stat-label">Projects</div>
-      </div>
-      <div>
-        <div class="vf-stat-num">${getEstYear(notes)}</div>
-        <div class="vf-stat-label">Est.</div>
-      </div>
+    <p class="vf-hero-subtitle">Crafting digital experiences with precision and care.</p>
+    <div class="vf-hero-actions">
+      <a href="#work" class="vf-btn-primary">View Work</a>
+      <a href="mailto:" class="vf-btn-secondary">Get in Touch</a>
     </div>
-  </section>
-  <div class="vf-marquee-wrap">
-    <div class="vf-marquee">${marquee}</div>
   </div>
-</div>
+</section>
 
+<!-- Projects -->
 <section class="vf-section" id="work">
-  <h2 class="vf-section-title">Work</h2>
+  <span class="vf-section-label">Selected Work</span>
   ${notes.length > 0
     ? `<div class="vf-grid">\n${cards}\n</div>`
-    : `<p style="color:#777;font-size:1rem">No published projects yet.</p>`}
+    : `<p style="font-size:17px;color:#6E6E73">No published projects yet.</p>`}
+</section>
+
+<!-- About -->
+<section class="vf-about" id="about">
+  <div class="vf-about-inner">
+    <span class="vf-about-label">About</span>
+    <p class="vf-about-text">Building thoughtful digital products with attention to detail and a focus on what matters.</p>
+    <div class="vf-skills">${skillChips}</div>
+  </div>
 </section>
 
 ${renderFooter(siteTitle)}
@@ -256,8 +360,11 @@ function buildPage(note: ParsedNote, siteTitle: string): SiteFile {
   const description = (note.frontmatter.description as string | undefined) ?? "";
   const date        = note.frontmatter.date as string | undefined;
   const tags        = Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [];
-  const tagChips    = tags
-    .map((t) => `<span class="vf-tag" style="color:#fff;border-color:#fff">${escapeHtml(String(t))}</span>`)
+  const idx         = Math.abs(hashString(note.slug)) % CARD_COLORS.length;
+  const heroBg      = CARD_COLORS[idx];
+
+  const tagChips = tags
+    .map((t) => `<span class="vf-project-tag">${escapeHtml(String(t))}</span>`)
     .join("");
 
   const html = `<!DOCTYPE html>
@@ -270,20 +377,27 @@ ${htmlHead(`${escapeHtml(title)} — ${escapeHtml(siteTitle)}`)}
 
 ${renderNav(siteTitle, "../")}
 
-<div class="vf-project-header" style="background:#FF4D00;color:#fff;border-bottom:2px solid #0A0A0A">
-  <div class="vf-project-inner">
-    <a href="../index.html" class="vf-back-btn">← Back</a>
-    <h1 class="vf-project-title">${escapeHtml(title)}</h1>
-    ${date ? `<p style="margin-top:0.6rem;font-size:0.9rem;opacity:0.8">${escapeHtml(String(date))}</p>` : ""}
-    ${tags.length > 0 ? `<div class="vf-tags" style="margin-top:1rem">${tagChips}</div>` : ""}
+<div class="vf-back-wrap">
+  <a href="../index.html" class="vf-back-btn">&#8249; Back</a>
+</div>
+
+<div class="vf-project-hero-wrap">
+  <div class="vf-project-hero" style="background:${heroBg}">
+    <h1 class="vf-project-hero-title">${escapeHtml(title)}</h1>
   </div>
+</div>
+
+<div class="vf-project-meta">
+  <h2 class="vf-project-title">${escapeHtml(title)}</h2>
+  ${date ? `<p class="vf-project-date">${escapeHtml(String(date))}</p>` : ""}
+  ${tags.length > 0 ? `<div class="vf-project-tags">${tagChips}</div>` : ""}
 </div>
 
 <div class="vf-prose">
   ${markdownToHtml(note.body)}
 </div>
 
-${renderFooter(siteTitle, "../")}
+${renderFooter(siteTitle)}
 
 </body>
 </html>`;
@@ -337,19 +451,16 @@ function collectTags(notes: ParsedNote[]): string[] {
   return [...seen];
 }
 
-function getEstYear(notes: ParsedNote[]): string {
-  const years = notes
-    .map((n) => extractYear(n.frontmatter.date as string | undefined))
-    .filter((y) => y !== "—")
-    .map(Number)
-    .filter((y) => y > 1900 && y <= new Date().getFullYear() + 1);
-  return years.length > 0 ? String(Math.min(...years)) : String(new Date().getFullYear());
+function extractYear(date: string | undefined): string {
+  if (!date) return "";
+  const m = date.match(/\d{4}/);
+  return m ? m[0] : "";
 }
 
-function extractYear(date: string | undefined): string {
-  if (!date) return "—";
-  const m = date.match(/\d{4}/);
-  return m ? m[0] : "—";
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h;
 }
 
 function escapeHtml(str: string): string {
