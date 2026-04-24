@@ -170,8 +170,10 @@ function markdownToHtml(md: string): string {
       const name = ref.split("|")[0].trim().split("/").pop() ?? ref;
       return `<img src="../images/${encodeURIComponent(name)}" alt="${escapeHtml(name)}" />`;
     })
-    // Markdown images: ![alt](src) — must precede link regex
-    .replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, (_, alt, src) => {
+    // Markdown images: ![alt](src) or ![alt](src "title") — must precede link regex
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, rawSrc) => {
+      // Strip optional title: 'title' or "title" at end of src
+      const src = rawSrc.trim().replace(/\s+["'][^"']*["']\s*$/, "");
       if (/^https?:\/\//.test(src)) {
         return `<img src="${src}" alt="${escapeHtml(alt)}" />`;
       }

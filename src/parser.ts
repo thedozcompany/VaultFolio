@@ -158,7 +158,8 @@ export function extractImageRefs(content: string): ImageRef[] {
   // Standard markdown images: ![alt](./path/image.png) or ![alt](image.png "title")
   const mdRe = /!\[[^\]]*\]\(([^)]+)\)/g;
   while ((m = mdRe.exec(content)) !== null) {
-    const path = m[1].trim().split(/\s+/)[0];
+    // Strip optional title ('title' or "title") from end before extracting path
+    const path = m[1].trim().replace(/\s+["'][^"']*["']\s*$/, "");
     if (!path.startsWith("http") && IMAGE_EXT_RE.test(path) && !seen.has(path)) {
       seen.add(path);
       refs.push({ type: "markdown", path });
