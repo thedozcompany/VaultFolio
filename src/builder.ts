@@ -1,4 +1,5 @@
 import { ParsedNote } from "./parser";
+import { VaultFolioSettings } from "./settings";
 
 export interface SiteFile {
   path: string;
@@ -193,6 +194,15 @@ img { max-width: 100%; height: auto; display: block; }
   padding: 60px 0;
 }
 
+/* ── Filters ── */
+.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; margin-bottom: 32px; }
+.vf-filter-btn {
+  background: transparent; border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.6);
+  padding: 6px 16px; border-radius: 100px; font-size: 13px; cursor: pointer; transition: all 0.2s; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.vf-filter-btn:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
+.vf-filter-btn.active { background: #fff; color: #000; border-color: #fff; font-weight: 500; }
+
 /* ── About ── */
 .vf-about { background: #111111; padding: 120px 60px; }
 .vf-about-inner {
@@ -378,7 +388,11 @@ img { max-width: 100%; height: auto; display: block; }
   font-style: italic; margin: 1.5rem 0;
 }
 .vf-prose hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 3rem 0; }
-.vf-prose img { border-radius: 8px; margin: 2rem 0; }
+.vf-prose img { border-radius: 8px; margin: 0; }
+.vf-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 3rem 0; }
+.vf-gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.vf-gallery img { margin: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.vf-image-single { display: flex; justify-content: center; margin: 3rem 0; }
 
 /* ── Nav scroll JS ── */
 /* (handled inline via script) */
@@ -424,13 +438,31 @@ function htmlHead(pageTitle: string): string {
   <style>${BASE_CSS}</style>`;
 }
 
-function renderNav(siteName: string, root = ""): string {
+function normalizeNavHref(href: string): string {
+  if (!href) return href;
+  // Anchor links, absolute paths, relative paths stay as-is
+  if (href.startsWith("#") || href.startsWith("/") || href.startsWith("./") || href.startsWith("../")) return href;
+  // Already has protocol
+  if (/^https?:\/\//.test(href) || /^mailto:/.test(href)) return href;
+  // Bare domain like www.example.com — add https://
+  return "https://" + href;
+}
+
+function renderNav(siteName: string, root = "", navLinks = "Work: #work, About: #about"): string {
+  const linkItems = navLinks.split(",").map(entry => {
+    const parts = entry.trim().split(":");
+    const label = parts[0].trim();
+    const rawHref = parts.slice(1).join(":").trim();
+    if (!label || !rawHref) return "";
+    const fullHref = normalizeNavHref(rawHref);
+    const isExternal = /^https?:\/\//.test(fullHref);
+    const targetAttr = isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
+    return `<a href="${escapeHtml(fullHref)}" class="vf-nav-link"${targetAttr}>${escapeHtml(label)}</a>`;
+  }).filter(Boolean).join("\n    ");
   return `<nav class="vf-nav" id="vf-nav">
   <a href="${root}index.html" class="vf-nav-logo">${escapeHtml(siteName)}</a>
   <div class="vf-nav-links">
-    <a href="${root}index.html#work" class="vf-nav-link">Work</a>
-    <a href="${root}index.html#about" class="vf-nav-link">About</a>
-    <a href="mailto:" class="vf-nav-link">Contact</a>
+    ${linkItems}
   </div>
 </nav>
 <script>
@@ -451,31 +483,80 @@ function renderFooter(siteName: string): string {
 </footer>`;
 }
 
+// ── Scripts ───────────────────────────────────────────────────────────────────
+
+function renderTagFilterScript(): string {
+  return `<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const filters = document.querySelectorAll(".vf-filter-btn");
+  const cards = document.querySelectorAll(".vf-filter-card");
+  
+  filters.forEach(btn => {
+    btn.addEventListener("click", () => {
+      filters.forEach(f => f.classList.remove("active"));
+      btn.classList.add("active");
+      
+      const tag = btn.getAttribute("data-filter");
+      
+      cards.forEach(card => {
+        if (tag === "all") {
+          card.style.display = "";
+        } else {
+          const cardTags = card.getAttribute("data-tags") || "";
+          const tList = cardTags.split(" ");
+          if (tList.includes(tag)) {
+            card.style.display = "";
+          } else {
+            card.style.display = "none";
+          }
+        }
+      });
+    });
+  });
+});
+</script>`;
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function buildSite(notes: ParsedNote[], siteTitle: string): BuildResult {
-  const pages = notes.map((note) => buildPage(note, siteTitle));
-  const index = buildIndex(notes, siteTitle);
+export function buildSite(notes: ParsedNote[], settings: VaultFolioSettings): BuildResult {
+  const siteTitle = settings.siteName;
+  const theme = settings.theme ?? "apple";
+  let pages, index;
+  if (theme === "editorial") {
+    pages = notes.map((note) => buildEditorialPage(note, siteTitle));
+    index = buildEditorialIndex(notes, settings);
+  } else if (theme === "apple") {
+    pages = notes.map((note) => buildApplePage(note, siteTitle));
+    index = buildAppleIndex(notes, settings);
+  } else if (theme === "swiss") {
+    pages = notes.map((note) => buildSwissPage(note, siteTitle));
+    index = buildSwissIndex(notes, settings);
+  } else {
+    pages = notes.map((note) => buildPage(note, siteTitle));
+    index = buildIndex(notes, settings);
+  }
   return { files: [index, ...pages], pageCount: pages.length, imageMap: new Map() };
 }
 
 // ── Index page ────────────────────────────────────────────────────────────────
 
-function buildIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
+function buildIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile {
+  const siteTitle = settings.siteName;
   // Project rows
   const rows = notes
     .map((n, i) => {
-      const num   = String(i + 1).padStart(2, "0");
+      const num = String(i + 1).padStart(2, "0");
       const title = (n.frontmatter.title as string | undefined) ?? n.slug;
-      const tags  = Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [];
-      const year  = extractYear(n.frontmatter.date as string | undefined);
+      const tags = Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [];
+      const year = extractYear(n.frontmatter.date as string | undefined);
 
       const tagPills = tags
         .slice(0, 3)
         .map((t) => `<span class="vf-project-tag-pill">${escapeHtml(t)}</span>`)
         .join("");
 
-      return `<a href="pages/${n.slug}.html" class="vf-project-row">
+      return `<a href="pages/${n.slug}.html" class="vf-project-row vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
   <span class="vf-project-num">${num}</span>
   <span class="vf-project-name">${escapeHtml(title)}</span>
   <div class="vf-project-meta-right">
@@ -494,6 +575,15 @@ function buildIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
     .map((s) => `<span class="vf-skill">${escapeHtml(s)}</span>`)
     .join("");
 
+  // Filter Bar
+  const allTagsSorted = Array.from(allTags).sort();
+  const filterHtml = allTagsSorted.length > 0 ? `
+    <div class="vf-filter-bar">
+      <button class="vf-filter-btn active" data-filter="all">All</button>
+      ${allTagsSorted.map((t: string) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+    </div>
+  ` : "";
+
   // Hero title — make last word italic + accent
   const titleWords = escapeHtml(siteTitle).split(" ");
   const heroTitle =
@@ -508,14 +598,14 @@ ${htmlHead(escapeHtml(siteTitle))}
 </head>
 <body>
 
-${renderNav(siteTitle)}
+${renderNav(siteTitle, "", settings.navLinks)}
 
 <!-- Hero -->
 <section class="vf-hero">
   <div class="vf-hero-inner">
     <span class="vf-hero-label">Portfolio &mdash; 2026</span>
     <h1 class="vf-hero-title">${heroTitle}</h1>
-    <p class="vf-hero-subtitle">Crafting digital experiences with precision, intention, and a relentless eye for detail.</p>
+    <p class="vf-hero-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
   </div>
   <div class="vf-scroll-indicator">
     <span>Scroll</span>
@@ -527,6 +617,7 @@ ${renderNav(siteTitle)}
 <section id="work">
   <div class="vf-projects-section">
     <span class="vf-section-label">Selected Work</span>
+    ${filterHtml}
     ${notes.length > 0
       ? rows
       : `<p class="vf-no-projects">No published projects yet.</p>`}
@@ -538,7 +629,7 @@ ${renderNav(siteTitle)}
   <div class="vf-about-inner">
     <div class="vf-about-left">
       <h2 class="vf-about-heading">Building things that matter.</h2>
-      <p class="vf-about-body">A multidisciplinary creator focused on craft, clarity, and impact. Every project is an opportunity to do something remarkable.</p>
+      <p class="vf-about-body">${settings.aboutText}</p>
     </div>
     <div class="vf-about-right">
       <div class="vf-about-detail">
@@ -570,12 +661,12 @@ ${renderFooter(siteTitle)}
 // ── Project page ──────────────────────────────────────────────────────────────
 
 function buildPage(note: ParsedNote, siteTitle: string): SiteFile {
-  const title       = (note.frontmatter.title as string | undefined) ?? note.slug;
+  const title = (note.frontmatter.title as string | undefined) ?? note.slug;
   const description = (note.frontmatter.description as string | undefined) ?? "";
-  const date        = note.frontmatter.date as string | undefined;
-  const tags        = Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [];
-  const idx         = Math.abs(hashString(note.slug)) % CARD_COLORS.length;
-  const heroBg      = CARD_COLORS[idx];
+  const date = note.frontmatter.date as string | undefined;
+  const tags = Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [];
+  const idx = Math.abs(hashString(note.slug)) % CARD_COLORS.length;
+  const heroBg = CARD_COLORS[idx];
 
   const tagChips = tags
     .map((t) => `<span class="vf-project-page-tag">${escapeHtml(String(t))}</span>`)
@@ -619,7 +710,7 @@ ${renderFooter(siteTitle)}
 // ── Markdown → HTML ───────────────────────────────────────────────────────────
 
 function markdownToHtml(md: string): string {
-  return md
+  let html = md
     .replace(/^#{6}\s+(.+)$/gm, "<h6>$1</h6>")
     .replace(/^#{5}\s+(.+)$/gm, "<h5>$1</h5>")
     .replace(/^#{4}\s+(.+)$/gm, "<h4>$1</h4>")
@@ -649,6 +740,20 @@ function markdownToHtml(md: string): string {
     .replace(/\n{2,}/g, "</p><p>")
     .replace(/^(?!<[h1-6polbui])(.+)$/gm, "<p>$1</p>")
     .trim();
+
+  // Post-processing: Cluster consecutive images into galleries
+  html = html.replace(/((?:<img[^>]+>\s*)+)/g, (match) => {
+    const count = (match.match(/<img/g) || []).length;
+    if (count > 1) {
+      const colClass = (count % 4 === 0) ? 'cols-4' : 'cols-2';
+      return `<div class="vf-gallery ${colClass}">\n${match.trim()}\n</div>\n`;
+    } else if (count === 1) {
+      return `<div class="vf-image-single">\n${match.trim()}\n</div>\n`;
+    }
+    return match;
+  });
+
+  return html;
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -680,4 +785,889 @@ function escapeHtml(str: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// ── EDITORIAL THEME ──────────────────────────────────────────────────────────
+
+const EDITORIAL_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body.vf-editorial {
+  background: #FFFFFF;
+  color: #0A0A0A;
+  font-family: 'DM Sans', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.vf-editorial a { color: inherit; text-decoration: none; }
+.vf-editorial img { max-width: 100%; height: auto; display: block; margin: 0; }
+.vf-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; margin: 40px 0; }
+.vf-gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.vf-gallery img { margin: 0; aspect-ratio: 3/4; object-fit: cover; border-radius: 0; }
+.vf-image-single { display: flex; justify-content: center; margin: 40px 0; }
+
+/* Navigation */
+.vf-nav-ed {
+  background: #FFFFFF;
+  border-top: 4px solid #0A0A0A;
+  border-bottom: 1px solid #0A0A0A;
+  padding: 16px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.vf-nav-ed-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0A0A0A;
+}
+.vf-nav-ed-left, .vf-nav-ed-right {
+  font-size: 14px;
+  font-variant: small-caps;
+}
+
+/* Hero */
+.vf-hero-ed {
+  background: #FFFFFF;
+  padding: 80px 40px 40px;
+}
+.vf-hero-ed-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(48px, 10vw, 120px);
+  font-weight: 900;
+  letter-spacing: -3px;
+  line-height: 0.9;
+  color: #0A0A0A;
+  text-align: left;
+}
+.vf-hero-ed-divider {
+  border-bottom: 3px solid #0A0A0A;
+  margin: 40px 0;
+}
+.vf-hero-ed-cols {
+  display: flex; gap: 40px;
+  justify-content: space-between;
+}
+.vf-hero-ed-bio {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 24px;
+  max-width: 600px;
+}
+.vf-hero-ed-stats {
+  display: flex; gap: 40px;
+}
+.vf-hero-ed-stat {
+  display: flex; flex-direction: column;
+}
+.vf-hero-ed-stat-val {
+  font-family: 'Playfair Display', serif;
+  font-size: 32px; font-weight: 700;
+}
+.vf-hero-ed-stat-lbl {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+/* Projects */
+.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px; }
+.vf-filter-btn { background: transparent; border: 1px solid #0A0A0A; padding: 4px 16px; border-radius: 4px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; }
+.vf-filter-btn:hover { background: rgba(0,0,0,0.05); }
+.vf-filter-btn.active { background: #0A0A0A; color: #FFFFFF; }
+
+.vf-projects-ed {
+  padding: 80px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.vf-projects-ed-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: #0A0A0A;
+  border: 1px solid #0A0A0A;
+}
+.vf-card-ed {
+  background: #FFFFFF;
+  display: flex; flex-direction: column;
+  position: relative;
+  text-decoration: none;
+  color: #0A0A0A;
+}
+.vf-card-ed.full { grid-column: 1 / -1; }
+.vf-card-ed-header {
+  padding: 40px;
+  min-height: 300px;
+  display: flex; flex-direction: column;
+  border-radius: 0;
+}
+.vf-card-ed-num {
+  font-size: 14px;
+  margin-bottom: auto;
+}
+.vf-card-ed-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 32px;
+  margin-bottom: 16px;
+}
+.vf-card-ed-desc {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.vf-card-ed-tags {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+  margin-bottom: 24px;
+}
+.vf-card-ed-link {
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  padding-bottom: 2px;
+  align-self: flex-start;
+}
+
+/* Quote */
+.vf-quote-ed {
+  background: #0A0A0A;
+  padding: 80px 40px;
+  text-align: center;
+}
+.vf-quote-ed-text {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(28px, 4vw, 56px);
+  font-style: italic;
+  color: #FFFFFF;
+}
+
+/* Footer */
+.vf-footer-ed {
+  border-top: 4px solid #0A0A0A;
+  background: #FFFFFF;
+  padding: 80px 40px 40px;
+}
+.vf-footer-ed-cols {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px;
+  margin-bottom: 80px;
+  font-family: 'Playfair Display', serif;
+  font-size: 14px; color: #555;
+  max-width: 1200px; margin: 0 auto;
+}
+.vf-footer-ed-bottom {
+  text-align: center; font-size: 11px; color: #999;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Project Page */
+.vf-page-ed-header {
+  text-align: center;
+  padding: 80px 40px 40px;
+  border-bottom: 1px solid #0A0A0A;
+  max-width: 1200px; margin: 0 auto;
+}
+.vf-page-ed-issue {
+  font-variant: small-caps; margin-bottom: 24px; color: #555;
+}
+.vf-page-ed-title {
+  font-family: 'Playfair Display', serif; font-size: 72px; font-weight: 900; line-height: 1.1; margin-bottom: 24px;
+}
+.vf-page-ed-meta { font-size: 18px; font-family: 'DM Sans', sans-serif; }
+
+.vf-page-ed-content {
+  max-width: 680px; margin: 0 auto; padding: 80px 40px;
+}
+.vf-prose-ed p {
+  font-size: 18px; line-height: 1.9; margin: 1.5rem 0;
+}
+.vf-prose-ed p:first-of-type::first-letter {
+  float: left; font-family: 'Playfair Display', serif; font-size: 72px; line-height: 60px;
+  padding-right: 8px; font-weight: 900;
+}
+.vf-prose-ed a {
+  color: #0A0A0A; text-decoration: underline;
+}
+.vf-prose-ed strong {
+  font-weight: 700;
+}
+.vf-prose-ed pre, .vf-prose-ed code {
+  background: #F5F4EF;
+  color: #0A0A0A;
+  border-radius: 4px;
+}
+.vf-prose-ed pre { padding: 16px; overflow-x: auto; font-size: 14px; }
+.vf-prose-ed code { padding: 2px 4px; }
+
+.vf-page-ed-tags { display: flex; gap: 8px; margin-top: 60px; }
+.vf-page-ed-tag { font-variant: small-caps; border: 1px solid #0A0A0A; padding: 4px 12px; font-size: 12px; }
+
+.vf-page-ed-back {
+  position: absolute; top: 40px; left: 40px; font-size: 14px; color: #555; text-decoration: none;
+}
+.vf-page-ed-back:hover { color: #0A0A0A; }
+
+@media (max-width: 768px) {
+  .vf-hero-ed-cols { flex-direction: column; }
+  .vf-projects-ed-grid { grid-template-columns: 1fr; }
+  .vf-footer-ed-cols { grid-template-columns: 1fr; }
+  .vf-page-ed-title { font-size: 48px; }
+  .vf-nav-ed-left, .vf-nav-ed-right { display: none; }
+}
+`;
+
+const ED_COLORS = ["#F5F4EF", "#E8E4DC", "#1A1A1A", "#F0EBE0"];
+
+function buildEditorialIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile {
+  const siteTitle = settings.siteName;
+  const rows = notes.map((n, i) => {
+    const num = String(i + 1).padStart(2, "0");
+    const title = (n.frontmatter.title as string | undefined) ?? n.slug;
+    const desc = (n.frontmatter.description as string | undefined) ?? "";
+    const tags = Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [];
+
+    // Pattern: 0(full), 1(half), 2(half), 3(full) ...
+    const isFull = i % 3 === 0;
+    const fullClass = isFull ? " full" : "";
+
+    const bgColor = ED_COLORS[i % ED_COLORS.length];
+    const textColor = bgColor === "#1A1A1A" ? "#FFFFFF" : "#0A0A0A";
+
+    const tagsStr = tags.slice(0, 3).join(" • ");
+
+    return `
+<a href="pages/${n.slug}.html" class="vf-card-ed${fullClass} vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
+  <div class="vf-card-ed-header" style="background: ${bgColor}; color: ${textColor};">
+    <div class="vf-card-ed-num">NO. ${num}</div>
+    <div class="vf-card-ed-title">${escapeHtml(title)}</div>
+    ${desc ? `<div class="vf-card-ed-desc">${escapeHtml(desc)}</div>` : ""}
+    ${tagsStr ? `<div class="vf-card-ed-tags">${escapeHtml(tagsStr)}</div>` : ""}
+    <div class="vf-card-ed-link" style="border-bottom-color: ${textColor}">Read more &rarr;</div>
+  </div>
+</a>`;
+  }).join("n");
+
+  const allTags = Array.from(new Set(notes.flatMap(n => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags as string[] : []))).sort();
+  const filterHtml = allTags.length > 0 ? `
+    <div class="vf-filter-bar">
+      <button class="vf-filter-btn active" data-filter="all">All</button>
+      ${allTags.map((t: string) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+    </div>
+  ` : "";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(siteTitle)} — Editorial</title>
+  <style>${EDITORIAL_CSS}</style>
+</head>
+<body class="vf-editorial">
+
+<nav class="vf-nav-ed">
+  <div class="vf-nav-ed-left">April 2026</div>
+  <div class="vf-nav-ed-logo">${escapeHtml(siteTitle)}</div>
+  <div class="vf-nav-ed-right">Vol. 1</div>
+</nav>
+
+<section class="vf-hero-ed">
+  <h1 class="vf-hero-ed-title">${escapeHtml(siteTitle)}</h1>
+  <div class="vf-hero-ed-divider"></div>
+  <div class="vf-hero-ed-cols">
+    <div class="vf-hero-ed-bio">${escapeHtml(settings.heroSubtitle)}</div>
+    <div class="vf-hero-ed-stats">
+      <div class="vf-hero-ed-stat">
+        <span class="vf-hero-ed-stat-val">${notes.length}</span>
+        <span class="vf-hero-ed-stat-lbl">Projects</span>
+      </div>
+      <div class="vf-hero-ed-stat">
+        <span class="vf-hero-ed-stat-val">10+</span>
+        <span class="vf-hero-ed-stat-lbl">Years</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="vf-projects-ed">
+  ${filterHtml}
+  <div class="vf-projects-ed-grid">
+    ${rows}
+  </div>
+</section>
+
+<section class="vf-quote-ed">
+  <p class="vf-quote-ed-text">${escapeHtml(settings.quoteText)}</p>
+</section>
+
+<footer class="vf-footer-ed">
+  <div class="vf-footer-ed-cols">
+    <div><strong>About</strong><br>Crafting digital experiences with precision, intention, and a relentless eye for detail.</div>
+    <div><strong>Links</strong><br>Instagram<br>Twitter<br>LinkedIn</div>
+    <div><strong>Contact</strong><br>hello@example.com</div>
+  </div>
+  <div class="vf-footer-ed-bottom">Published with VaultFolio</div>
+</footer>
+
+${allTags.length > 0 ? renderTagFilterScript() : ""}
+</body>
+</html>`;
+
+  return { path: "index.html", content: html };
+}
+
+function buildEditorialPage(note: ParsedNote, siteTitle: string): SiteFile {
+  const title = (note.frontmatter.title as string | undefined) ?? note.slug;
+  const date = note.frontmatter.date as string | undefined;
+  const tags = Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [];
+
+  const tagHtml = tags.map(t => `<span class="vf-page-ed-tag">${escapeHtml(String(t))}</span>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)} — ${escapeHtml(siteTitle)}</title>
+  <style>${EDITORIAL_CSS}</style>
+</head>
+<body class="vf-editorial">
+
+<a href="../index.html" class="vf-page-ed-back">&larr; Back to portfolio</a>
+
+<header class="vf-page-ed-header">
+  <div class="vf-page-ed-issue">Feature Project</div>
+  <h1 class="vf-page-ed-title">${escapeHtml(title)}</h1>
+  <div class="vf-page-ed-meta">${date ? escapeHtml(date) : "Recent Work"}</div>
+</header>
+
+<main class="vf-page-ed-content">
+  <div class="vf-prose-ed">
+    ${markdownToHtml(note.body)}
+  </div>
+  ${tagHtml ? `<div class="vf-page-ed-tags">${tagHtml}</div>` : ""}
+</main>
+
+</body>
+</html>`;
+  return { path: `pages/${note.slug}.html`, content: html };
+}
+
+// ── APPLE THEME ──────────────────────────────────────────────────────────────
+
+const APPLE_CSS = `
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body.vf-apple {
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.vf-apple a { color: inherit; text-decoration: none; }
+.vf-apple img { max-width: 100%; height: auto; display: block; border-radius: 12px; }
+
+/* Navigation */
+.vf-nav-ap {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 40px; height: 52px;
+}
+.vf-nav-ap-logo {
+  font-weight: 600; font-size: 17px; letter-spacing: -0.01em; color: #1d1d1f;
+}
+
+/* Hero */
+.vf-hero-ap {
+  text-align: center; padding: 120px 40px 80px; max-width: 980px; margin: 0 auto;
+}
+.vf-hero-ap-title {
+  font-size: clamp(48px, 8vw, 80px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.05; color: #1d1d1f; margin-bottom: 24px;
+}
+.vf-hero-ap-subtitle {
+  font-size: 24px; font-weight: 400; color: #86868b; line-height: 1.33337; letter-spacing: .009em; max-width: 680px; margin: 0 auto;
+}
+
+/* Projects */
+.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 32px; }
+.vf-filter-btn { background: rgba(0,0,0,0.05); color: #1d1d1f; border: none; padding: 8px 16px; border-radius: 100px; font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; font-weight: 400; }
+.vf-filter-btn:hover { background: rgba(0,0,0,0.1); }
+.vf-filter-btn.active { background: #1d1d1f; color: #fff; font-weight: 500; }
+
+.vf-projects-ap {
+  padding: 40px; max-width: 1200px; margin: 0 auto;
+}
+.vf-projects-ap-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;
+}
+.vf-card-ap {
+  background: #ffffff; border-radius: 18px; padding: 40px; display: flex; flex-direction: column;
+  transition: transform 0.2s cubic-bezier(0,0,0.5,1), box-shadow 0.2s cubic-bezier(0,0,0.5,1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+}
+.vf-card-ap:hover {
+  transform: scale(1.02); box-shadow: 0 12px 48px rgba(0,0,0,0.08);
+}
+.vf-card-ap-title {
+  font-size: 28px; font-weight: 600; letter-spacing: .004em; color: #1d1d1f; margin-bottom: 12px;
+}
+.vf-card-ap-desc {
+  font-size: 17px; font-weight: 400; color: #86868b; margin-bottom: 24px; line-height: 1.47;
+}
+.vf-card-ap-tags {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;
+}
+.vf-tag-ap {
+  background: #f5f5f7; color: #1d1d1f; font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 100px;
+}
+.vf-card-ap-link {
+  margin-top: auto; color: #0066cc; font-size: 17px; font-weight: 400;
+}
+.vf-card-ap-link:hover { text-decoration: underline; }
+
+/* Quote & Footer */
+.vf-quote-ap {
+  text-align: center; padding: 120px 40px; max-width: 800px; margin: 0 auto;
+}
+.vf-quote-ap p {
+  font-size: 32px; font-weight: 600; color: #1d1d1f; line-height: 1.25; letter-spacing: .004em;
+}
+.vf-footer-ap {
+  border-top: 1px solid #d2d2d7; padding: 32px 40px; text-align: center; font-size: 12px; color: #86868b;
+  max-width: 980px; margin: 0 auto;
+}
+
+/* Project Page */
+.vf-page-ap-header {
+  text-align: center; padding: 100px 40px 60px; max-width: 800px; margin: 0 auto;
+}
+.vf-page-ap-title {
+  font-size: 64px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.015em; line-height: 1.05; margin-bottom: 16px;
+}
+.vf-page-ap-meta {
+  font-size: 17px; color: #86868b; font-weight: 400;
+}
+.vf-page-ap-content {
+  background: #ffffff; padding: 80px 40px; border-radius: 32px 32px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.04);
+}
+.vf-prose-ap {
+  max-width: 680px; margin: 0 auto;
+}
+.vf-prose-ap p {
+  font-size: 19px; line-height: 1.6; color: #1d1d1f; margin-bottom: 1.5rem; font-weight: 400;
+}
+.vf-prose-ap h2, .vf-prose-ap h3 {
+  font-weight: 600; color: #1d1d1f; letter-spacing: .004em; margin-top: 2.5rem; margin-bottom: 1rem;
+}
+.vf-prose-ap h2 { font-size: 32px; }
+.vf-prose-ap h3 { font-size: 24px; }
+.vf-prose-ap a { color: #0066cc; text-decoration: none; }
+.vf-prose-ap a:hover { text-decoration: underline; }
+.vf-prose-ap pre, .vf-prose-ap code {
+  background: #f5f5f7; color: #1d1d1f; border-radius: 8px; font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", "Oxygen Mono", "Ubuntu Monospace", "Source Code Pro", "Fira Mono", "Droid Sans Mono", "Courier New", monospace;
+}
+.vf-prose-ap pre { padding: 20px; overflow-x: auto; font-size: 14px; margin: 2rem 0; }
+.vf-prose-ap code { padding: 3px 6px; font-size: 0.9em; }
+.vf-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin: 60px 0; }
+.vf-gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.vf-gallery img { margin: 0; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); width: 100%; height: 100%; object-fit: cover; }
+.vf-image-single { display: flex; justify-content: center; margin: 60px 0; }
+.vf-prose-ap blockquote {
+  border-left: 4px solid #d2d2d7; padding-left: 1.5rem; color: #86868b; margin: 2rem 0; font-size: 24px; font-style: italic;
+}
+.vf-prose-ap hr { border: none; border-top: 1px solid #d2d2d7; margin: 3rem 0; }
+
+.vf-back-ap {
+  position: absolute; top: 16px; left: 40px; color: #0066cc; font-size: 14px; font-weight: 400; z-index: 200; display: flex; align-items: center;
+}
+.vf-back-ap:hover { text-decoration: underline; }
+`;
+
+function buildAppleIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile {
+  const siteTitle = settings.siteName;
+  const rows = notes.map((n) => {
+    const title = (n.frontmatter.title as string | undefined) ?? n.slug;
+    const desc = (n.frontmatter.description as string | undefined) ?? "";
+    const tags = Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [];
+
+    const tagHtml = tags.slice(0, 3).map(t => `<span class="vf-tag-ap">${escapeHtml(String(t))}</span>`).join("");
+
+    return `
+<a href="pages/${n.slug}.html" class="vf-card-ap vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
+  <div class="vf-card-ap-title">${escapeHtml(title)}</div>
+  ${desc ? `<div class="vf-card-ap-desc">${escapeHtml(desc)}</div>` : ""}
+  ${tagHtml ? `<div class="vf-card-ap-tags">${tagHtml}</div>` : ""}
+  <div class="vf-card-ap-link">Learn more &gt;</div>
+</a>`;
+  }).join("\n");
+
+  const allTags = Array.from(new Set(notes.flatMap(n => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags as string[] : []))).sort();
+  const filterHtml = allTags.length > 0 ? `
+    <div class="vf-filter-bar">
+      <button class="vf-filter-btn active" data-filter="all">All</button>
+      ${allTags.map((t: string) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+    </div>
+  ` : "";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(siteTitle)}</title>
+  <style>${APPLE_CSS}</style>
+</head>
+<body class="vf-apple">
+
+<nav class="vf-nav-ap">
+  <div class="vf-nav-ap-logo">${escapeHtml(siteTitle)}</div>
+  <div style="display:flex;gap:24px;align-items:center;">
+    ${settings.navLinks.split(",").map(entry => { const parts = entry.trim().split(":"); const label = parts[0].trim(); const rawHref = parts.slice(1).join(":").trim(); if (!label || !rawHref) return ""; const fullHref = normalizeNavHref(rawHref); const isExternal = /^https?:\/\//.test(fullHref); const targetAttr = isExternal ? ` target="_blank" rel="noopener noreferrer"` : ""; return `<a href="${escapeHtml(fullHref)}" style="color:#0066cc; font-size:14px; font-weight:400;"${targetAttr}>${escapeHtml(label)}</a>`; }).filter(Boolean).join("\n    ")}
+  </div>
+</nav>
+
+<header class="vf-hero-ap">
+  <h1 class="vf-hero-ap-title">${escapeHtml(settings.heroTitle)}</h1>
+  <p class="vf-hero-ap-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
+</header>
+
+<section id="work" class="vf-projects-ap">
+  ${filterHtml}
+  <div class="vf-projects-ap-grid">
+    ${rows}
+  </div>
+</section>
+
+<section class="vf-quote-ap">
+  <p>${escapeHtml(settings.quoteText)}</p>
+</section>
+
+<footer class="vf-footer-ap">
+  Copyright &copy; 2026 ${escapeHtml(siteTitle)}. All rights reserved. <br/>
+  Published with VaultFolio.
+</footer>
+
+${allTags.length > 0 ? renderTagFilterScript() : ""}
+</body>
+</html>`;
+
+  return { path: "index.html", content: html };
+}
+
+function buildApplePage(note: ParsedNote, siteTitle: string): SiteFile {
+  const title = (note.frontmatter.title as string | undefined) ?? note.slug;
+  const date = note.frontmatter.date as string | undefined;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)} - ${escapeHtml(siteTitle)}</title>
+  <style>${APPLE_CSS}</style>
+</head>
+<body class="vf-apple">
+
+<nav class="vf-nav-ap" style="justify-content: center; position: relative;">
+  <a href="../index.html" class="vf-back-ap">&lt; Back</a>
+  <div class="vf-nav-ap-logo">${escapeHtml(title)}</div>
+</nav>
+
+<header class="vf-page-ap-header">
+  <h1 class="vf-page-ap-title">${escapeHtml(title)}</h1>
+  <p class="vf-page-ap-meta">${date ? escapeHtml(date) : "Project Showcase"}</p>
+</header>
+
+<main class="vf-page-ap-content">
+  <div class="vf-prose-ap">
+    ${markdownToHtml(note.body)}
+  </div>
+</main>
+
+<footer class="vf-footer-ap" style="border-top: none; padding-top: 80px;">
+  Copyright &copy; 2026 ${escapeHtml(siteTitle)}. All rights reserved.
+</footer>
+
+</body>
+</html>`;
+  return { path: `pages/${note.slug}.html`, content: html };
+}
+
+// ── MINIMAL SWISS THEME ──────────────────────────────────────────────────────
+
+const SWISS_CSS = `
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body.vf-swiss {
+  background: #ffffff;
+  color: #000000;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+.vf-swiss a { color: inherit; text-decoration: none; }
+.vf-swiss img { max-width: 100%; height: auto; display: block; border-radius: 0; }
+
+/* Navigation */
+.vf-nav-sw {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 40px;
+  border-bottom: 1px solid #000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  font-size: 14px;
+}
+.vf-nav-sw-logo { }
+.vf-nav-sw-right { text-align: right; }
+
+/* Hero */
+.vf-hero-sw {
+  padding: 160px 40px;
+  border-bottom: 1px solid #000;
+}
+.vf-hero-sw-inner {
+  max-width: 1200px;
+}
+.vf-hero-sw-title {
+  font-size: clamp(64px, 12vw, 160px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.85;
+  margin-bottom: 40px;
+}
+.vf-hero-sw-subtitle {
+  font-size: clamp(24px, 4vw, 40px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  max-width: 800px;
+}
+
+/* Projects */
+.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; padding: 0 40px; }
+.vf-filter-btn { background: transparent; color: #000; border: none; font-weight: 700; padding: 4px 0; border-bottom: 2px solid transparent; text-transform: uppercase; letter-spacing: -0.02em; font-size: 14px; cursor: pointer; }
+.vf-filter-btn:hover { color: #ff0000; border-bottom-color: #ff0000; }
+.vf-filter-btn.active { border-bottom-color: #000; }
+
+.vf-projects-sw {
+  padding: 0;
+}
+.vf-card-sw {
+  display: grid;
+  grid-template-columns: 80px 1fr 200px;
+  align-items: center;
+  padding: 60px 40px;
+  border-bottom: 1px solid #000;
+  transition: background 0.2s;
+  color: #000;
+}
+.vf-card-sw:hover {
+  background: #f0f0f0;
+}
+.vf-card-sw-num {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ff0000;
+}
+.vf-card-sw-title {
+  font-size: clamp(40px, 6vw, 80px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.vf-card-sw-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right;
+}
+.vf-card-sw-tags {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+}
+.vf-card-sw-arrow {
+  color: #ff0000; font-size: 24px; font-weight: 700; margin-top: 16px;
+}
+
+/* Quote & Footer */
+.vf-quote-sw {
+  padding: 160px 40px;
+  border-bottom: 1px solid #000;
+  text-align: left;
+}
+.vf-quote-sw p {
+  font-size: clamp(32px, 5vw, 64px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  max-width: 1000px;
+}
+.vf-footer-sw {
+  padding: 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+.vf-footer-sw-right { text-align: right; color: #ff0000; }
+
+/* Project Page */
+.vf-page-sw-header {
+  padding: 120px 40px;
+  border-bottom: 1px solid #000;
+}
+.vf-page-sw-title {
+  font-size: clamp(64px, 10vw, 140px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.85;
+  margin-bottom: 24px;
+}
+.vf-page-sw-meta {
+  font-size: 24px; font-weight: 400; color: #ff0000;
+}
+.vf-page-sw-content {
+  padding: 80px 40px; max-width: 900px;
+}
+.vf-prose-sw {
+  font-size: 24px; line-height: 1.5; font-weight: 400; letter-spacing: -0.01em;
+}
+.vf-prose-sw p { margin-bottom: 2rem; }
+.vf-prose-sw h2 { font-size: 48px; font-weight: 700; margin: 4rem 0 2rem; line-height: 1; letter-spacing: -0.03em; }
+.vf-prose-sw h3 { font-size: 32px; font-weight: 700; margin: 3rem 0 1.5rem; line-height: 1; letter-spacing: -0.02em; }
+.vf-prose-sw a { color: #ff0000; border-bottom: 2px solid #ff0000; }
+.vf-prose-sw a:hover { color: #000; border-bottom-color: #000; }
+.vf-prose-sw img { margin: 0; width: 100%; filter: grayscale(100%); transition: filter 0.3s; }
+.vf-prose-sw img:hover { filter: grayscale(0%); }
+.vf-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; border: 1px solid #000; margin: 40px 0; border-bottom: none; }
+.vf-gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.vf-gallery img { border-bottom: 1px solid #000; margin: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%); transition: filter 0.3s; }
+.vf-gallery img:nth-child(even) { border-left: 1px solid #000; }
+.vf-gallery img:hover { filter: grayscale(0%); }
+.vf-image-single { display: flex; justify-content: center; margin: 4rem 0; }
+.vf-prose-sw blockquote { border-left: 8px solid #ff0000; padding-left: 2rem; margin: 3rem 0; font-size: 32px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+.vf-prose-sw pre { background: #f0f0f0; padding: 2rem; font-size: 16px; margin: 2rem 0; }
+
+.vf-back-sw {
+  padding: 20px 40px; border-bottom: 1px solid #000; display: block; font-weight: 700; font-size: 14px; text-transform: uppercase;
+}
+.vf-back-sw:hover { background: #ff0000; color: #fff; }
+
+@media (max-width: 768px) {
+  .vf-card-sw { grid-template-columns: 1fr; gap: 16px; padding: 40px 24px; }
+  .vf-card-sw-right { align-items: flex-start; text-align: left; }
+  .vf-nav-sw, .vf-footer-sw { padding: 24px; }
+  .vf-hero-sw, .vf-quote-sw, .vf-page-sw-header { padding: 80px 24px; }
+}
+`;
+
+function buildSwissIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile {
+  const siteTitle = settings.siteName;
+  const rows = notes.map((n, i) => {
+    const num = String(i + 1).padStart(2, "0");
+    const title = (n.frontmatter.title as string | undefined) ?? n.slug;
+    const tags = Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [];
+
+    const tagsStr = tags.slice(0, 3).join(" / ");
+
+    return `
+<a href="pages/${n.slug}.html" class="vf-card-sw vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
+  <div class="vf-card-sw-num">${num}</div>
+  <div class="vf-card-sw-title">${escapeHtml(title)}</div>
+  <div class="vf-card-sw-right">
+    ${tagsStr ? `<div class="vf-card-sw-tags">${escapeHtml(tagsStr)}</div>` : ""}
+    <div class="vf-card-sw-arrow">&rarr;</div>
+  </div>
+</a>`;
+  }).join("\n");
+
+  const allTags = Array.from(new Set(notes.flatMap(n => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags as string[] : []))).sort();
+  const filterHtml = allTags.length > 0 ? `
+    <div class="vf-filter-bar">
+      <button class="vf-filter-btn active" data-filter="all" style="margin-right: 16px;">All</button>
+      ${allTags.map((t: string) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+    </div>
+  ` : "";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(siteTitle)} — Swiss</title>
+  <style>${SWISS_CSS}</style>
+</head>
+<body class="vf-swiss">
+
+<nav class="vf-nav-sw">
+  <div class="vf-nav-sw-logo">${escapeHtml(siteTitle)}</div>
+  <div class="vf-nav-sw-right">Portfolio</div>
+</nav>
+
+<header class="vf-hero-sw">
+  <div class="vf-hero-sw-inner">
+    <h1 class="vf-hero-sw-title">${escapeHtml(siteTitle)}</h1>
+    <p class="vf-hero-sw-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
+  </div>
+</header>
+
+<section class="vf-projects-sw">
+  ${filterHtml}
+  ${rows}
+</section>
+
+<section class="vf-quote-sw">
+  <p>${escapeHtml(settings.quoteText)}</p>
+</section>
+
+<footer class="vf-footer-sw">
+  <div>&copy; 2026 ${escapeHtml(siteTitle)}</div>
+  <div class="vf-footer-sw-right">Built with VaultFolio</div>
+</footer>
+
+${allTags.length > 0 ? renderTagFilterScript() : ""}
+</body>
+</html>`;
+
+  return { path: "index.html", content: html };
+}
+
+function buildSwissPage(note: ParsedNote, siteTitle: string): SiteFile {
+  const title = (note.frontmatter.title as string | undefined) ?? note.slug;
+  const date = note.frontmatter.date as string | undefined;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)} - ${escapeHtml(siteTitle)}</title>
+  <style>${SWISS_CSS}</style>
+</head>
+<body class="vf-swiss">
+
+<a href="../index.html" class="vf-back-sw">&larr; Return to Index</a>
+
+<header class="vf-page-sw-header">
+  <h1 class="vf-page-sw-title">${escapeHtml(title)}</h1>
+  <div class="vf-page-sw-meta">${date ? escapeHtml(date) : "Project"}</div>
+</header>
+
+<main class="vf-page-sw-content">
+  <div class="vf-prose-sw">
+    ${markdownToHtml(note.body)}
+  </div>
+</main>
+
+<footer class="vf-footer-sw" style="border-top: 1px solid #000;">
+  <div>${escapeHtml(title)}</div>
+  <div class="vf-footer-sw-right">&copy; 2026</div>
+</footer>
+
+</body>
+</html>`;
+  return { path: `pages/${note.slug}.html`, content: html };
 }

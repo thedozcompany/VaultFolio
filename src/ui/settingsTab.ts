@@ -62,10 +62,81 @@ export class VaultFolioSettingsTab extends PluginSettingTab {
       .setDesc("Visual theme for the generated site.")
       .addDropdown((drop) =>
         drop
-          .addOption("default", "Default")
+          .addOption("default", "Dark Cinematic (Default)")
+          .addOption("editorial", "Editorial")
+          .addOption("apple", "Apple Minimalist")
+          .addOption("swiss", "Minimal Swiss")
           .setValue(this.plugin.settings.theme)
           .onChange(async (value) => {
             this.plugin.settings.theme = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // --- Site Content section ---
+    containerEl.createEl("h3", { text: "Site Content" });
+
+    new Setting(containerEl)
+      .setName("Nav Menu Links")
+      .setDesc("Format: 'Label: URL, Label: URL' (e.g. 'Work: #work, About: #about')")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder("Work: #work, GitHub: https://github.com/...")
+          .setValue(this.plugin.settings.navLinks)
+          .onChange(async (value) => {
+            this.plugin.settings.navLinks = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Hero Title")
+      .setDesc("The main large text on the homepage.")
+      .addText((text) =>
+        text
+          .setPlaceholder("Pro. Beyond.")
+          .setValue(this.plugin.settings.heroTitle)
+          .onChange(async (value) => {
+            this.plugin.settings.heroTitle = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Hero Subtitle")
+      .setDesc("The text below the main hero title.")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder("Welcome to my digital portfolio.")
+          .setValue(this.plugin.settings.heroSubtitle)
+          .onChange(async (value) => {
+            this.plugin.settings.heroSubtitle = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("About Text")
+      .setDesc("Text shown in the About section (HTML supported).")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder("I'm a designer and developer...")
+          .setValue(this.plugin.settings.aboutText)
+          .onChange(async (value) => {
+            this.plugin.settings.aboutText = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Quote Text")
+      .setDesc("Quote displayed above the footer.")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder('"The details are not the details. They make the design."')
+          .setValue(this.plugin.settings.quoteText)
+          .onChange(async (value) => {
+            this.plugin.settings.quoteText = value;
             await this.plugin.saveSettings();
           })
       );

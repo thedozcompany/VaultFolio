@@ -77,7 +77,7 @@ export default class VaultFolioPlugin extends Plugin {
       this.settings.portfolioFolder
     );
     const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path));
-    const result = buildSite(siteNotes, this.settings.siteName);
+    const result = buildSite(siteNotes, this.settings);
 
     const outputBase = this.settings.outputFolder.replace(/\/+$/, "");
     const adapter = this.app.vault.adapter;
