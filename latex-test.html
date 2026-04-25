@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultFolio — LaTeX render test</title>
+  <!-- Exact lines added to htmlHead() in builder.ts -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 60px auto; padding: 0 24px; line-height: 1.7; color: #1a1a1a; }
+    h2 { margin: 2em 0 0.5em; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: #888; }
+    .case { background: #f7f7f7; border-left: 3px solid #7C3AED; padding: 16px 20px; margin: 12px 0; border-radius: 4px; }
+    .source { font-family: monospace; font-size: 13px; color: #555; margin-bottom: 8px; }
+    .rendered { padding: 4px 0; }
+    .pass { color: #16a34a; font-size: 12px; font-weight: 600; }
+    .fail { color: #dc2626; font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<h1>VaultFolio — LaTeX render test</h1>
+<p>If KaTeX loaded correctly every formula below will be rendered. Raw <code>$...$</code> or <code>$$...$$</code> visible = broken.</p>
+
+<h2>Inline math — <code>$...$</code></h2>
+
+<div class="case">
+  <div class="source">Obsidian source: The energy formula is $E = mc^2$.</div>
+  <div class="rendered">The energy formula is $E = mc^2$.</div>
+</div>
+
+<div class="case">
+  <div class="source">Obsidian source: Euler's identity $e^{i\pi} + 1 = 0$ is beautiful.</div>
+  <div class="rendered">Euler's identity $e^{i\pi} + 1 = 0$ is beautiful.</div>
+</div>
+
+<div class="case">
+  <div class="source">Obsidian source: The quadratic formula gives $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$.</div>
+  <div class="rendered">The quadratic formula gives $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$.</div>
+</div>
+
+<h2>Display math — <code>$$...$$</code></h2>
+
+<div class="case">
+  <div class="source">Obsidian source: $$\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}$$</div>
+  <div class="rendered">$$\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}$$</div>
+</div>
+
+<div class="case">
+  <div class="source">Obsidian source: $$\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}$$</div>
+  <div class="rendered">$$\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}$$</div>
+</div>
+
+<div class="case">
+  <div class="source">Obsidian source: $$\begin{pmatrix} a & b \\ c & d \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} ax+by \\ cx+dy \end{pmatrix}$$</div>
+  <div class="rendered">$$\begin{pmatrix} a & b \\ c & d \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} ax+by \\ cx+dy \end{pmatrix}$$</div>
+</div>
+
+<h2>Math with characters that would be mangled by the markdown pipeline</h2>
+
+<div class="case">
+  <div class="source">Asterisks (would turn into &lt;em&gt; without stashing): $a * b$ and $\vec{v} \cdot \vec{w}$</div>
+  <div class="rendered">$a * b$ and $\vec{v} \cdot \vec{w}$</div>
+</div>
+
+<div class="case">
+  <div class="source">Underscores and subscripts: $x_1 + x_2 = x_{12}$</div>
+  <div class="rendered">$x_1 + x_2 = x_{12}$</div>
+</div>
+
+<h2>Alternate delimiters — <code>\[...\]</code> and <code>\(...\)</code></h2>
+
+<div class="case">
+  <div class="source">Display: \[\nabla \cdot \mathbf{E} = \frac{\rho}{\varepsilon_0}\]</div>
+  <div class="rendered">\[\nabla \cdot \mathbf{E} = \frac{\rho}{\varepsilon_0}\]</div>
+</div>
+
+<div class="case">
+  <div class="source">Inline: Maxwell's equation \(\nabla \times \mathbf{B} = \mu_0 \mathbf{J}\) in differential form.</div>
+  <div class="rendered">Maxwell's equation \(\nabla \times \mathbf{B} = \mu_0 \mathbf{J}\) in differential form.</div>
+</div>
+
+<script>
+  // After KaTeX runs, check for any un-rendered delimiters.
+  // KaTeX replaces $...$ with <span class="katex"> — if we still find raw $ it failed.
+  window.addEventListener('load', () => {
+    document.querySelectorAll('.rendered').forEach(el => {
+      const raw = el.textContent;
+      const hasMath = /\$|\\\[|\\\(/.test(raw);
+      const rendered = el.querySelector('.katex');
+      const lbl = document.createElement('div');
+      if (!hasMath) return;
+      lbl.className = rendered ? 'pass' : 'fail';
+      lbl.textContent = rendered ? '✓ rendered' : '✗ KaTeX did not run — check the console';
+      el.after(lbl);
+    });
+  });
+</script>
+
+</body>
+</html>

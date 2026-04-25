@@ -463,6 +463,9 @@ function htmlHead(pageTitle: string): string {
   return `  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${pageTitle}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\\\[',right:'\\\\]',display:true},{left:'$',right:'$',display:false},{left:'\\\\(',right:'\\\\)',display:false}],throwOnError:false})"></script>
   <style>${BASE_CSS}</style>`;
 }
 
@@ -741,7 +744,20 @@ ${renderFooter(siteTitle)}
 // ── Markdown → HTML ───────────────────────────────────────────────────────────
 
 function markdownToHtml(md: string): string {
-  let html = parseCallouts(md)
+  // Stash math blocks before the markdown pipeline so their content
+  // (subscripts, asterisks, brackets, etc.) is never mangled.
+  const mathStash: string[] = [];
+  const stashMath = (s: string) => {
+    mathStash.push(s);
+    return `\x00M${mathStash.length - 1}\x00`;
+  };
+  const prepped = md
+    .replace(/\$\$([\s\S]+?)\$\$/g, (m) => stashMath(m))   // display math first
+    .replace(/\\\[[\s\S]+?\\\]/g,    (m) => stashMath(m))   // \[...\] display
+    .replace(/\$([^\$\n]+?)\$/g,     (m) => stashMath(m))   // inline $...$
+    .replace(/\\\(.*?\\\)/g,         (m) => stashMath(m));  // \(...\) inline
+
+  let html = parseCallouts(prepped)
     .replace(/^#{6}\s+(.+)$/gm, "<h6>$1</h6>")
     .replace(/^#{5}\s+(.+)$/gm, "<h5>$1</h5>")
     .replace(/^#{4}\s+(.+)$/gm, "<h4>$1</h4>")
@@ -771,6 +787,12 @@ function markdownToHtml(md: string): string {
     .replace(/\n{2,}/g, "</p><p>")
     .replace(/^(?!<[h1-6polbui])(.+)$/gm, "<p>$1</p>")
     .trim();
+
+  // Restore math blocks — must happen before image gallery clustering
+  // so that stash tokens aren't accidentally wrapped in gallery divs.
+  if (mathStash.length) {
+    html = html.replace(/\x00M(\d+)\x00/g, (_, i) => mathStash[+i]);
+  }
 
   // Post-processing: Cluster consecutive images into galleries
   html = html.replace(/((?:<img[^>]+>\s*)+)/g, (match) => {
