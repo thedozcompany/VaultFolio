@@ -183,10 +183,11 @@
     <small>Live preview with sample portfolio data</small>
   </div>
   <div class="switcher">
-    <button class="switcher-btn" data-theme="simple">Simple</button>
+    <button class="switcher-btn active" data-theme="simple">Simple</button>
     <button class="switcher-btn" data-theme="apple">Apple</button>
     <button class="switcher-btn" data-theme="editorial">Editorial</button>
-    <button class="switcher-btn active" data-theme="dark">Dark Cinematic</button>
+    <button class="switcher-btn" data-theme="swiss">Swiss</button>
+    <button class="switcher-btn" data-theme="dark">Dark Cinematic</button>
   </div>
 </div>
 
@@ -199,7 +200,7 @@
       <div class="preview-dot"></div>
       <div class="preview-url">alexrivera.github.io/portfolio</div>
     </div>
-    <iframe id="preview-frame" title="Theme Preview" sandbox="allow-same-origin"></iframe>
+    <iframe id="preview-frame" title="Theme Preview"></iframe>
   </div>
 </div>
 
@@ -227,9 +228,9 @@ const HERO_TITLE = "Alex Rivera";
 const HERO_SUBTITLE = "Brand Designer &amp; Developer crafting digital experiences with intention.";
 
 const PROJECTS = [
-  { num: "01", slug: "flux-rebrand",  title: "Flux Rebrand",  desc: "Complete visual identity redesign for a leading fintech company.", tags: ["branding", "fintech"],  year: "2026", color: "#1A1A2E", textLight: true  },
-  { num: "02", slug: "calm-app",      title: "Calm App",      desc: "Mobile app redesign focused on mindfulness and user wellness.",   tags: ["ui/ux", "mobile"],    year: "2025", color: "#16213E", textLight: true  },
-  { num: "03", slug: "nova-launch",   title: "Nova Launch",   desc: "Motion-driven product launch campaign with cinematic visuals.",   tags: ["motion", "product"],  year: "2025", color: "#0F3460", textLight: true  },
+  { num: "01", slug: "flux-rebrand",  title: "Flux Rebrand",  desc: "Complete visual identity redesign for a leading fintech company.", tags: ["branding", "fintech"],  year: "2026", date: "March 2026",    readTime: "4 min read", color: "#1A1A2E", textLight: true  },
+  { num: "02", slug: "calm-app",      title: "Calm App",      desc: "Mobile app redesign focused on mindfulness and user wellness.",   tags: ["ui/ux", "mobile"],    year: "2025", date: "November 2025", readTime: "6 min read", color: "#16213E", textLight: true  },
+  { num: "03", slug: "nova-launch",   title: "Nova Launch",   desc: "Motion-driven product launch campaign with cinematic visuals.",   tags: ["motion", "product"],  year: "2025", date: "August 2025",   readTime: "3 min read", color: "#0F3460", textLight: true  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -493,6 +494,7 @@ function simpleHTML() {
 <a href="#" class="sp-card" style="text-decoration:none">
   <div class="sp-card-title">${p.title}</div>
   <div class="sp-card-desc">${p.desc}</div>
+  <div class="sp-card-meta">${p.date}</div>
   <div class="sp-card-tags">
     ${p.tags.map(t => `<span class="sp-tag">${t}</span>`).join("")}
   </div>
@@ -505,20 +507,22 @@ function simpleHTML() {
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:#fff;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:16px;line-height:1.6}
 a{color:#1a1a1a;text-decoration:none}
+img{max-width:100%;height:auto;display:block}
 .sp-nav{padding:20px 40px;border-bottom:1px solid #eee}
 .sp-nav-logo{font-size:16px;font-weight:600}
 .sp-hero{padding:60px 40px 48px;max-width:800px;margin:0 auto}
-.sp-hero h1{font-size:32px;font-weight:700;margin-bottom:10px}
+.sp-hero h1{font-size:32px;font-weight:700;margin-bottom:12px}
 .sp-hero p{font-size:16px;color:#555}
-.sp-section{max-width:800px;margin:0 auto;padding:0 40px 60px}
-.sp-section-heading{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:20px}
+.sp-section{max-width:800px;margin:0 auto;padding:0 40px 80px}
 .sp-cards{display:flex;flex-direction:column;gap:16px}
-.sp-card{border:1px solid #eee;padding:24px;color:#1a1a1a;display:block}
+.sp-card{border:1px solid #eee;padding:24px;color:#1a1a1a;display:block;transition:box-shadow 0.15s ease,transform 0.15s ease}
+.sp-card:hover{box-shadow:0 2px 12px rgba(0,0,0,0.07);transform:translateY(-1px)}
 .sp-card-title{font-size:18px;font-weight:600;margin-bottom:6px}
-.sp-card-desc{font-size:14px;color:#555;margin-bottom:12px}
-.sp-card-tags{display:flex;flex-wrap:wrap;gap:6px}
+.sp-card-desc{font-size:14px;color:#555;margin-bottom:10px}
+.sp-card-meta{font-size:12px;color:#aaa;margin-bottom:10px}
+.sp-card-tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .sp-tag{font-size:12px;color:#777;padding:2px 8px;border:1px solid #ddd}
-.sp-footer{border-top:1px solid #eee;padding:28px 40px;text-align:center;font-size:13px;color:#999}
+.sp-footer{border-top:1px solid #eee;padding:32px 40px;text-align:center;font-size:13px;color:#999}
 </style></head>
 <body>
 <nav class="sp-nav">
@@ -529,10 +533,68 @@ a{color:#1a1a1a;text-decoration:none}
   <p>Brand Designer &amp; Developer. A collection of selected work.</p>
 </section>
 <section class="sp-section">
-  <div class="sp-section-heading">Work</div>
   <div class="sp-cards">${cards}</div>
 </section>
 <footer class="sp-footer">${SITE_NAME} &mdash; Built with VaultFolio</footer>
+</body></html>`;
+}
+
+// ── SWISS ─────────────────────────────────────────────────────────────────────
+function swissHTML() {
+  const rows = PROJECTS.map((p, i) => `
+<a href="#" class="vf-row-sw vf-filter-card" style="text-decoration:none">
+  <span class="vf-row-sw-num">${p.num}</span>
+  <span class="vf-row-sw-title">${p.title}</span>
+  <div class="vf-row-sw-tags">${p.tags.map(t => `<span class="vf-tag-sw">${t}</span>`).join("")}</div>
+  <span class="vf-row-sw-arrow">&rarr;</span>
+</a>`).join("\n");
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${SITE_NAME}</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#fff;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:15px;line-height:1.5}
+a{color:inherit;text-decoration:none}
+.vf-nav-sw{display:flex;justify-content:space-between;align-items:center;padding:28px 40px;border-bottom:2px solid #1a1a1a}
+.vf-nav-sw-logo{font-size:15px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase}
+.vf-nav-sw-right{font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#999}
+.vf-hero-sw{padding:80px 40px;border-bottom:1px solid #eee;max-width:1100px}
+.vf-hero-sw h1{font-size:clamp(36px,6vw,80px);font-weight:700;letter-spacing:-2px;line-height:1;margin-bottom:24px}
+.vf-hero-sw p{font-size:16px;color:#666;max-width:480px}
+.vf-projects-sw{max-width:1100px;padding:0 40px}
+.vf-projects-sw-heading{font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:#999;padding:32px 0 16px;border-bottom:1px solid #eee}
+.vf-row-sw{display:grid;grid-template-columns:48px 1fr auto 32px;align-items:center;gap:24px;padding:20px 0;border-bottom:1px solid #eee;color:#1a1a1a;transition:background 0.12s}
+.vf-row-sw:hover{background:#fafafa}
+.vf-row-sw-num{font-size:12px;color:#bbb;font-variant-numeric:tabular-nums}
+.vf-row-sw-title{font-size:18px;font-weight:600;letter-spacing:-0.3px}
+.vf-row-sw-tags{display:flex;gap:8px;justify-content:flex-end}
+.vf-tag-sw{font-size:11px;color:#888;padding:3px 8px;border:1px solid #ddd}
+.vf-row-sw-arrow{font-size:18px;color:#bbb;transition:color 0.12s;text-align:right}
+.vf-row-sw:hover .vf-row-sw-arrow{color:#1a1a1a}
+.vf-quote-sw{padding:80px 40px;max-width:800px;font-size:clamp(18px,2.5vw,28px);font-style:italic;color:#555;line-height:1.4;border-top:1px solid #eee;margin-top:0}
+.vf-footer-sw{border-top:2px solid #1a1a1a;padding:28px 40px;display:flex;justify-content:space-between;font-size:12px;color:#999;letter-spacing:0.05em;text-transform:uppercase}
+</style></head>
+<body>
+<nav class="vf-nav-sw">
+  <div class="vf-nav-sw-logo">${SITE_NAME}</div>
+  <div class="vf-nav-sw-right">Portfolio</div>
+</nav>
+<header class="vf-hero-sw" style="padding-left:40px">
+  <h1>Brand<br>Designer &amp;<br>Developer</h1>
+  <p>Crafting digital experiences with precision and care.</p>
+</header>
+<section class="vf-projects-sw" style="padding-left:40px">
+  <div class="vf-projects-sw-heading">Selected Work</div>
+  ${rows}
+</section>
+<section class="vf-quote-sw" style="padding-left:40px">
+  &ldquo;The details are not the details. They make the design.&rdquo;
+</section>
+<footer class="vf-footer-sw">
+  <span>${SITE_NAME}</span>
+  <span>Built with VaultFolio</span>
+</footer>
 </body></html>`;
 }
 
@@ -540,10 +602,11 @@ a{color:#1a1a1a;text-decoration:none}
 // Switcher logic
 // ─────────────────────────────────────────────────────────────────────────────
 const themeMap = {
-  dark:       darkHTML,
+  simple:     simpleHTML,
   apple:      appleHTML,
   editorial:  editorialHTML,
-  simple:     simpleHTML,
+  swiss:      swissHTML,
+  dark:       darkHTML,
 };
 
 const frame = document.getElementById("preview-frame");
@@ -554,6 +617,13 @@ function setTheme(name) {
   if (!fn) return;
   frame.srcdoc = fn();
   buttons.forEach(b => b.classList.toggle("active", b.dataset.theme === name));
+  frame.onload = function() {
+    try {
+      frame.contentDocument.addEventListener('click', function(e) {
+        if (e.target.closest('a')) e.preventDefault();
+      }, true);
+    } catch(e) {}
+  };
 }
 
 buttons.forEach(btn => {
@@ -561,7 +631,7 @@ buttons.forEach(btn => {
 });
 
 // Load default
-setTheme("dark");
+setTheme("simple");
 </script>
 
 </body>

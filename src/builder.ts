@@ -459,10 +459,15 @@ ${CALLOUT_CSS}
 
 // ── Shared fragments ──────────────────────────────────────────────────────────
 
-function htmlHead(pageTitle: string): string {
+function htmlHead(pageTitle: string, description = "", ogType = "website"): string {
+  const descMeta = description
+    ? `\n  <meta name="description" content="${escapeHtml(description)}" />\n  <meta property="og:description" content="${escapeHtml(description)}" />`
+    : "";
   return `  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${pageTitle}</title>
+  <meta property="og:title" content="${pageTitle}" />
+  <meta property="og:type" content="${ogType}" />${descMeta}
   <style>${BASE_CSS}</style>`;
 }
 
@@ -545,6 +550,22 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>`;
 }
 
+// ── Sitemap ───────────────────────────────────────────────────────────────────
+
+function buildSitemap(notes: ParsedNote[], baseUrl: string): SiteFile {
+  const base = baseUrl.replace(/\/$/, "");
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = [
+    `  <url><loc>${base}/index.html</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>`,
+    ...notes.map(
+      (n) =>
+        `  <url><loc>${base}/pages/${n.slug}.html</loc><lastmod>${today}</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>`
+    ),
+  ].join("\n");
+  const content = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`;
+  return { path: "sitemap.xml", content };
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export function buildSite(notes: ParsedNote[], settings: VaultFolioSettings): BuildResult {
@@ -567,7 +588,14 @@ export function buildSite(notes: ParsedNote[], settings: VaultFolioSettings): Bu
     pages = notes.map((note) => buildPage(note, siteTitle));
     index = buildIndex(notes, settings);
   }
-  return { files: [index, ...pages], pageCount: pages.length, imageMap: new Map() };
+  const repo = settings.githubRepo ?? "";
+  const [owner, repoName] = repo.split("/");
+  const baseUrl = owner && repoName
+    ? `https://${owner}.github.io/${repoName}`
+    : "https://example.github.io/portfolio";
+  const sitemap = buildSitemap(notes, baseUrl);
+
+  return { files: [index, ...pages, sitemap], pageCount: pages.length, imageMap: new Map() };
 }
 
 // ── Index page ────────────────────────────────────────────────────────────────
@@ -625,7 +653,7 @@ function buildIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-${htmlHead(escapeHtml(siteTitle))}
+${htmlHead(escapeHtml(siteTitle), settings.aboutText ?? "")}
 </head>
 <body>
 
@@ -706,8 +734,7 @@ function buildPage(note: ParsedNote, siteTitle: string): SiteFile {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-${htmlHead(`${escapeHtml(title)} — ${escapeHtml(siteTitle)}`)}
-  <meta name="description" content="${escapeHtml(description)}" />
+${htmlHead(`${escapeHtml(title)} — ${escapeHtml(siteTitle)}`, description, "article")}
 </head>
 <body class="vf-project-page">
 
@@ -1126,7 +1153,7 @@ function buildEditorialIndex(notes: ParsedNote[], settings: VaultFolioSettings):
     <div class="vf-card-ed-link" style="border-bottom-color: ${textColor}">Read more &rarr;</div>
   </div>
 </a>`;
-  }).join("n");
+  }).join("\n");
 
   const allTags = Array.from(new Set(notes.flatMap(n => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags as string[] : []))).sort();
   const filterHtml = allTags.length > 0 ? `
@@ -1141,7 +1168,10 @@ function buildEditorialIndex(notes: ParsedNote[], settings: VaultFolioSettings):
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(siteTitle)} — Editorial</title>
+  <title>${escapeHtml(siteTitle)}</title>
+  <meta property="og:title" content="${escapeHtml(siteTitle)}" />
+  <meta property="og:type" content="website" />
+  ${settings.aboutText ? `<meta name="description" content="${escapeHtml(settings.aboutText)}" /><meta property="og:description" content="${escapeHtml(settings.aboutText)}" />` : ""}
   <style>${EDITORIAL_CSS}</style>
 </head>
 <body class="vf-editorial">
@@ -1200,6 +1230,7 @@ ${allTags.length > 0 ? renderTagFilterScript() : ""}
 function buildEditorialPage(note: ParsedNote, siteTitle: string): SiteFile {
   const title = (note.frontmatter.title as string | undefined) ?? note.slug;
   const date = note.frontmatter.date as string | undefined;
+  const desc = (note.frontmatter.description as string | undefined) ?? "";
   const tags = Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [];
 
   const tagHtml = tags.map(t => `<span class="vf-page-ed-tag">${escapeHtml(String(t))}</span>`).join("");
@@ -1210,6 +1241,9 @@ function buildEditorialPage(note: ParsedNote, siteTitle: string): SiteFile {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)} — ${escapeHtml(siteTitle)}</title>
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:type" content="article" />
+  ${desc ? `<meta name="description" content="${escapeHtml(desc)}" /><meta property="og:description" content="${escapeHtml(desc)}" />` : ""}
   <style>${EDITORIAL_CSS}</style>
 </head>
 <body class="vf-editorial">
@@ -1401,6 +1435,9 @@ function buildAppleIndex(notes: ParsedNote[], settings: VaultFolioSettings): Sit
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(siteTitle)}</title>
+  <meta property="og:title" content="${escapeHtml(siteTitle)}" />
+  <meta property="og:type" content="website" />
+  ${settings.aboutText ? `<meta name="description" content="${escapeHtml(settings.aboutText)}" /><meta property="og:description" content="${escapeHtml(settings.aboutText)}" />` : ""}
   <style>${APPLE_CSS}</style>
 </head>
 <body class="vf-apple">
@@ -1443,13 +1480,17 @@ ${allTags.length > 0 ? renderTagFilterScript() : ""}
 function buildApplePage(note: ParsedNote, siteTitle: string): SiteFile {
   const title = (note.frontmatter.title as string | undefined) ?? note.slug;
   const date = note.frontmatter.date as string | undefined;
+  const desc = (note.frontmatter.description as string | undefined) ?? "";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(title)} - ${escapeHtml(siteTitle)}</title>
+  <title>${escapeHtml(title)} — ${escapeHtml(siteTitle)}</title>
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:type" content="article" />
+  ${desc ? `<meta name="description" content="${escapeHtml(desc)}" /><meta property="og:description" content="${escapeHtml(desc)}" />` : ""}
   <style>${APPLE_CSS}</style>
 </head>
 <body class="vf-apple">
@@ -1678,7 +1719,10 @@ function buildSwissIndex(notes: ParsedNote[], settings: VaultFolioSettings): Sit
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(siteTitle)} — Swiss</title>
+  <title>${escapeHtml(siteTitle)}</title>
+  <meta property="og:title" content="${escapeHtml(siteTitle)}" />
+  <meta property="og:type" content="website" />
+  ${settings.aboutText ? `<meta name="description" content="${escapeHtml(settings.aboutText)}" /><meta property="og:description" content="${escapeHtml(settings.aboutText)}" />` : ""}
   <style>${SWISS_CSS}</style>
 </head>
 <body class="vf-swiss">
@@ -1719,13 +1763,17 @@ ${allTags.length > 0 ? renderTagFilterScript() : ""}
 function buildSwissPage(note: ParsedNote, siteTitle: string): SiteFile {
   const title = (note.frontmatter.title as string | undefined) ?? note.slug;
   const date = note.frontmatter.date as string | undefined;
+  const desc = (note.frontmatter.description as string | undefined) ?? "";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(title)} - ${escapeHtml(siteTitle)}</title>
+  <title>${escapeHtml(title)} — ${escapeHtml(siteTitle)}</title>
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:type" content="article" />
+  ${desc ? `<meta name="description" content="${escapeHtml(desc)}" /><meta property="og:description" content="${escapeHtml(desc)}" />` : ""}
   <style>${SWISS_CSS}</style>
 </head>
 <body class="vf-swiss">
@@ -1797,10 +1845,16 @@ img { max-width: 100%; height: auto; display: block; }
   border: 1px solid #eee;
   padding: 24px;
   color: #1a1a1a;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.sp-card:hover {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  transform: translateY(-1px);
 }
 .sp-card-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
 .sp-card-desc { font-size: 14px; color: #555; margin-bottom: 12px; }
-.sp-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-card-meta { font-size: 12px; color: #aaa; margin-bottom: 10px; }
+.sp-card-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .sp-tag {
   font-size: 12px; color: #777;
   padding: 2px 8px;
@@ -1822,8 +1876,10 @@ img { max-width: 100%; height: auto; display: block; }
   display: inline-block;
   padding: 24px 40px 0;
   font-size: 14px;
-  color: #555;
+  color: #aaa;
+  transition: color 0.12s ease;
 }
+.sp-back:hover { color: #1a1a1a; }
 .sp-page-header { max-width: 800px; margin: 0 auto; padding: 32px 40px 24px; }
 .sp-page-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
 .sp-page-date { font-size: 13px; color: #999; margin-bottom: 12px; }
@@ -1841,7 +1897,8 @@ img { max-width: 100%; height: auto; display: block; }
 .sp-prose h3 { font-size: 18px; font-weight: 600; margin: 1.5rem 0 0.6rem; }
 .sp-prose h4, .sp-prose h5, .sp-prose h6 { font-size: 16px; font-weight: 600; margin: 1.2rem 0 0.5rem; }
 .sp-prose p { font-size: 16px; line-height: 1.8; color: #333; margin: 1rem 0; }
-.sp-prose a { color: #1a1a1a; text-decoration: underline; }
+.sp-prose a { color: #555; text-decoration: underline; }
+.sp-prose a:hover { color: #1a1a1a; }
 .sp-prose strong { font-weight: 600; }
 .sp-prose em { font-style: italic; }
 .sp-prose ul { list-style: disc; padding-left: 1.5rem; margin: 0.8rem 0; }
@@ -1853,6 +1910,11 @@ img { max-width: 100%; height: auto; display: block; }
 .sp-prose blockquote { border-left: 3px solid #ddd; padding-left: 16px; color: #666; font-style: italic; margin: 1.5rem 0; }
 .sp-prose hr { border: none; border-top: 1px solid #eee; margin: 2rem 0; }
 .sp-prose img { width: 100%; margin: 1.5rem 0; }
+.sp-prose table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 15px; }
+.sp-prose th { text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #999; border-bottom: 2px solid #eee; padding: 8px 12px; }
+.sp-prose td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; color: #333; vertical-align: top; }
+.sp-prose tr:last-child td { border-bottom: none; }
+.sp-prose tr:nth-child(even) td { background: #fafafa; }
 
 @media (max-width: 640px) {
   .sp-nav { padding: 16px 20px; }
@@ -1871,6 +1933,7 @@ function buildSimpleIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
     .map((n) => {
       const title = (n.frontmatter.title as string | undefined) ?? n.slug;
       const desc  = (n.frontmatter.description as string | undefined) ?? "";
+      const date  = n.frontmatter.date as string | undefined;
       const tags  = Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [];
       const tagHtml = tags
         .map((t) => `<span class="sp-tag">${escapeHtml(t)}</span>`)
@@ -1878,6 +1941,7 @@ function buildSimpleIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
       return `<a href="pages/${n.slug}.html" class="sp-card">
   <div class="sp-card-title">${escapeHtml(title)}</div>
   ${desc ? `<div class="sp-card-desc">${escapeHtml(desc)}</div>` : ""}
+  ${date ? `<div class="sp-card-meta">${escapeHtml(String(date))}</div>` : ""}
   ${tags.length > 0 ? `<div class="sp-card-tags">${tagHtml}</div>` : ""}
 </a>`;
     })
@@ -1889,6 +1953,10 @@ function buildSimpleIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(siteTitle)}</title>
+  <meta name="description" content="Portfolio by ${escapeHtml(siteTitle)}" />
+  <meta property="og:title" content="${escapeHtml(siteTitle)}" />
+  <meta property="og:description" content="Portfolio by ${escapeHtml(siteTitle)}" />
+  <meta property="og:type" content="website" />
   <style>${SIMPLE_CSS}</style>
 </head>
 <body>
@@ -1903,7 +1971,6 @@ function buildSimpleIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
 </section>
 
 <section class="sp-section">
-  <div class="sp-section-heading">Work</div>
   ${notes.length > 0
     ? `<div class="sp-cards">${cards}</div>`
     : `<p class="sp-empty">No published projects yet.</p>`}
@@ -1922,6 +1989,7 @@ function buildSimpleIndex(notes: ParsedNote[], siteTitle: string): SiteFile {
 function buildSimplePage(note: ParsedNote, siteTitle: string): SiteFile {
   const title = (note.frontmatter.title as string | undefined) ?? note.slug;
   const date  = note.frontmatter.date as string | undefined;
+  const desc  = (note.frontmatter.description as string | undefined) ?? "";
   const tags  = Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [];
 
   const tagHtml = tags
@@ -1934,6 +2002,10 @@ function buildSimplePage(note: ParsedNote, siteTitle: string): SiteFile {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)} — ${escapeHtml(siteTitle)}</title>
+  ${desc ? `<meta name="description" content="${escapeHtml(desc)}" />` : ""}
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  ${desc ? `<meta property="og:description" content="${escapeHtml(desc)}" />` : ""}
+  <meta property="og:type" content="article" />
   <style>${SIMPLE_CSS}</style>
 </head>
 <body>

@@ -692,7 +692,7 @@ function buildSite(notes, settings) {
     index = buildSwissIndex(notes, settings);
   } else if (theme === "simple") {
     pages = notes.map((note) => buildSimplePage(note, siteTitle));
-    index = buildSimpleIndex(notes, siteTitle);
+    index = buildSimpleIndex(notes, settings);
   } else {
     pages = notes.map((note) => buildPage(note, siteTitle));
     index = buildIndex(notes, settings);
@@ -1896,7 +1896,8 @@ img { max-width: 100%; height: auto; display: block; }
 }
 ${CALLOUT_CSS}
 `.trim();
-function buildSimpleIndex(notes, siteTitle) {
+function buildSimpleIndex(notes, settings) {
+  const siteTitle = settings.siteName; // Extract title from settings
   const cards = notes.map((n) => {
     var _a, _b;
     const title = (_a = n.frontmatter.title) != null ? _a : n.slug;
@@ -1909,6 +1910,7 @@ function buildSimpleIndex(notes, siteTitle) {
   ${tags.length > 0 ? `<div class="sp-card-tags">${tagHtml}</div>` : ""}
 </a>`;
   }).join("\n");
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1925,7 +1927,7 @@ function buildSimpleIndex(notes, siteTitle) {
 
 <section class="sp-hero">
   <h1>${escapeHtml(siteTitle)}</h1>
-  <p>A collection of selected work.</p>
+  <p>${escapeHtml(settings.heroSubtitle)}</p> 
 </section>
 
 <section class="sp-section">
