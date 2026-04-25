@@ -14,7 +14,7 @@ interface TreeEntry {
   path: string;
   mode: "100644";
   type: "blob";
-  sha: string;
+  sha: string | null; // null = delete the file from the tree
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -46,6 +46,14 @@ export async function deploySite(
     // Step 1: resolve branch to its current commit + tree SHA
     const { commitSha, treeSha } = await getOrCreateBranch(owner, repo, branch, config.githubToken);
 
+    // Step 1b: find stale VaultFolio-managed files that must be deleted
+    const existingPaths = await fetchExistingPaths(owner, repo, treeSha, config.githubToken);
+    const newPathSet = new Set<string>([
+      ...files.keys(),
+      ...(images ? images.keys() : []),
+    ]);
+    const stalePaths = findStalePaths(existingPaths, newPathSet);
+
     // Step 2: upload each file as a blob
     const entries: TreeEntry[] = [];
     for (const [path, content] of files) {
@@ -57,6 +65,10 @@ export async function deploySite(
         const sha = await createBlob(owner, repo, content, "base64", config.githubToken);
         entries.push({ path, mode: "100644", type: "blob", sha });
       }
+    }
+    // Mark stale files for deletion (sha: null removes them from the tree)
+    for (const path of stalePaths) {
+      entries.push({ path, mode: "100644", type: "blob", sha: null });
     }
 
     // Step 3: create a new tree containing all blobs
@@ -209,6 +221,33 @@ async function updateRef(
     { sha: commitSha, force: true }
   );
   if (!res.ok) throw await buildApiError(res, "updating branch ref");
+}
+
+// ── Stale-file helpers ────────────────────────────────────────────────────────
+
+async function fetchExistingPaths(
+  owner: string,
+  repo: string,
+  treeSha: string,
+  token: string
+): Promise<string[]> {
+  const res = await ghFetch(
+    "GET",
+    `/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`,
+    token
+  );
+  // A 404 or any error here just means no files to clean up yet
+  if (!res.ok) return [];
+  const data = (await res.json()) as { tree: Array<{ path: string; type: string }> };
+  return data.tree
+    .filter((item) => item.type === "blob")
+    .map((item) => item.path);
+}
+
+function findStalePaths(existingPaths: string[], newPaths: Set<string>): string[] {
+  return existingPaths.filter(
+    (p) => (p.endsWith(".html") || p.startsWith("images/")) && !newPaths.has(p)
+  );
 }
 
 // ── Fetch utilities ───────────────────────────────────────────────────────────
