@@ -153,6 +153,38 @@ function slugify(text) {
 
 // src/builder.ts
 var CARD_COLORS = ["#1A1A2E", "#16213E", "#1B1B2F", "#0F3460", "#1C1C1E", "#2D1B69"];
+var CALLOUT_ICONS = {
+  note: "\u{1F4DD}",
+  info: "\u2139\uFE0F",
+  tip: "\u{1F4A1}",
+  warning: "\u26A0\uFE0F",
+  danger: "\u{1F534}",
+  question: "\u2753",
+  success: "\u2705",
+  failure: "\u274C",
+  bug: "\u{1F41B}",
+  example: "\u{1F4CB}",
+  quote: "\u{1F4AC}",
+  abstract: "\u{1F4C4}"
+};
+var CALLOUT_CSS = `
+.callout { border-radius: 6px; padding: 12px 16px; margin: 16px 0; border-left: 4px solid; }
+.callout-title { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+.callout-icon { font-size: 16px; line-height: 1; }
+.callout-content { font-size: 14px; line-height: 1.6; }
+.callout-note     { background: #f0f4ff; border-color: #3b82f6; color: #1e3a8a; }
+.callout-info     { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+.callout-tip      { background: #f0fdf4; border-color: #22c55e; color: #14532d; }
+.callout-warning  { background: #fffbeb; border-color: #f59e0b; color: #78350f; }
+.callout-danger   { background: #fff1f2; border-color: #ef4444; color: #7f1d1d; }
+.callout-question { background: #faf5ff; border-color: #a855f7; color: #4a1d96; }
+.callout-success  { background: #f0fdf4; border-color: #22c55e; color: #14532d; }
+.callout-failure  { background: #fff1f2; border-color: #ef4444; color: #7f1d1d; }
+.callout-bug      { background: #fff1f2; border-color: #ef4444; color: #7f1d1d; }
+.callout-example  { background: #f8fafc; border-color: #64748b; color: #1e293b; }
+.callout-quote    { background: #f8fafc; border-color: #64748b; color: #1e293b; }
+.callout-abstract { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
+`.trim();
 var BASE_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
 
@@ -562,6 +594,7 @@ img { max-width: 100%; height: auto; display: block; }
   .vf-project-content { padding: 60px 24px 80px; }
   .vf-prose p, .vf-prose li { font-size: 16px; }
 }
+${CALLOUT_CSS}
 `.trim();
 function htmlHead(pageTitle) {
   return `  <meta charset="UTF-8" />
@@ -657,6 +690,9 @@ function buildSite(notes, settings) {
   } else if (theme === "swiss") {
     pages = notes.map((note) => buildSwissPage(note, siteTitle));
     index = buildSwissIndex(notes, settings);
+  } else if (theme === "simple") {
+    pages = notes.map((note) => buildSimplePage(note, siteTitle));
+    index = buildSimpleIndex(notes, siteTitle);
   } else {
     pages = notes.map((note) => buildPage(note, siteTitle));
     index = buildIndex(notes, settings);
@@ -800,7 +836,7 @@ ${renderFooter(siteTitle)}
   return { path: `pages/${note.slug}.html`, content: html };
 }
 function markdownToHtml(md) {
-  let html = md.replace(/^#{6}\s+(.+)$/gm, "<h6>$1</h6>").replace(/^#{5}\s+(.+)$/gm, "<h5>$1</h5>").replace(/^#{4}\s+(.+)$/gm, "<h4>$1</h4>").replace(/^#{3}\s+(.+)$/gm, "<h3>$1</h3>").replace(/^#{2}\s+(.+)$/gm, "<h2>$1</h2>").replace(/^#{1}\s+(.+)$/gm, "<h1>$1</h1>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/!\[\[([^\]]+)\]\]/g, (_, ref) => {
+  let html = parseCallouts(md).replace(/^#{6}\s+(.+)$/gm, "<h6>$1</h6>").replace(/^#{5}\s+(.+)$/gm, "<h5>$1</h5>").replace(/^#{4}\s+(.+)$/gm, "<h4>$1</h4>").replace(/^#{3}\s+(.+)$/gm, "<h3>$1</h3>").replace(/^#{2}\s+(.+)$/gm, "<h2>$1</h2>").replace(/^#{1}\s+(.+)$/gm, "<h1>$1</h1>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/!\[\[([^\]]+)\]\]/g, (_, ref) => {
     var _a;
     const name = (_a = ref.split("|")[0].trim().split("/").pop()) != null ? _a : ref;
     return `<img src="../images/${encodeURIComponent(name)}" alt="${escapeHtml(name)}" />`;
@@ -854,6 +890,37 @@ function hashString(s) {
 }
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function applyInlineMd(text) {
+  return text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
+}
+function parseCallouts(md) {
+  var _a;
+  const lines = md.split("\n");
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const match = lines[i].match(/^>\s*\[!([\w]+)\]\s*(.*)/);
+    if (match) {
+      const type = match[1].toLowerCase();
+      const title = match[2].trim() || type.charAt(0).toUpperCase() + type.slice(1);
+      const contentLines = [];
+      i++;
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        contentLines.push(lines[i].replace(/^>\s?/, ""));
+        i++;
+      }
+      const icon = (_a = CALLOUT_ICONS[type]) != null ? _a : "\u{1F4DD}";
+      const contentHtml = contentLines.map(applyInlineMd).join("<br>");
+      out.push(
+        `<div class="callout callout-${escapeHtml(type)}"><div class="callout-title"><span class="callout-icon">${icon}</span><span class="callout-title-text">${escapeHtml(title)}</span></div><div class="callout-content">${contentHtml}</div></div>`
+      );
+    } else {
+      out.push(lines[i]);
+      i++;
+    }
+  }
+  return out.join("\n");
 }
 var EDITORIAL_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');
@@ -1082,6 +1149,7 @@ body.vf-editorial {
   .vf-page-ed-title { font-size: 48px; }
   .vf-nav-ed-left, .vf-nav-ed-right { display: none; }
 }
+${CALLOUT_CSS}
 `;
 var ED_COLORS = ["#F5F4EF", "#E8E4DC", "#1A1A1A", "#F0EBE0"];
 function buildEditorialIndex(notes, settings) {
@@ -1339,6 +1407,7 @@ body.vf-apple {
   position: absolute; top: 16px; left: 40px; color: #0066cc; font-size: 14px; font-weight: 400; z-index: 200; display: flex; align-items: center;
 }
 .vf-back-ap:hover { text-decoration: underline; }
+${CALLOUT_CSS}
 `;
 function buildAppleIndex(notes, settings) {
   const siteTitle = settings.siteName;
@@ -1615,6 +1684,7 @@ body.vf-swiss {
   .vf-nav-sw, .vf-footer-sw { padding: 24px; }
   .vf-hero-sw, .vf-quote-sw, .vf-page-sw-header { padding: 80px 24px; }
 }
+${CALLOUT_CSS}
 `;
 function buildSwissIndex(notes, settings) {
   const siteTitle = settings.siteName;
@@ -1718,6 +1788,197 @@ function buildSwissPage(note, siteTitle) {
 </html>`;
   return { path: `pages/${note.slug}.html`, content: html };
 }
+var SIMPLE_CSS = `
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+a { color: #1a1a1a; text-decoration: none; }
+img { max-width: 100%; height: auto; display: block; }
+
+/* Nav */
+.sp-nav {
+  padding: 20px 40px;
+  border-bottom: 1px solid #eee;
+}
+.sp-nav-logo { font-size: 16px; font-weight: 600; }
+
+/* Hero */
+.sp-hero {
+  padding: 60px 40px 48px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.sp-hero h1 { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
+.sp-hero p { font-size: 16px; color: #555; }
+
+/* Projects */
+.sp-section { max-width: 800px; margin: 0 auto; padding: 0 40px 80px; }
+.sp-section-heading {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: #999; margin-bottom: 24px;
+}
+.sp-cards { display: flex; flex-direction: column; gap: 16px; }
+.sp-card {
+  display: block;
+  border: 1px solid #eee;
+  padding: 24px;
+  color: #1a1a1a;
+}
+.sp-card-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.sp-card-desc { font-size: 14px; color: #555; margin-bottom: 12px; }
+.sp-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-tag {
+  font-size: 12px; color: #777;
+  padding: 2px 8px;
+  border: 1px solid #ddd;
+}
+.sp-empty { font-size: 15px; color: #999; padding: 24px 0; }
+
+/* Footer */
+.sp-footer {
+  border-top: 1px solid #eee;
+  padding: 32px 40px;
+  text-align: center;
+  font-size: 13px;
+  color: #999;
+}
+
+/* Project page */
+.sp-back {
+  display: inline-block;
+  padding: 24px 40px 0;
+  font-size: 14px;
+  color: #555;
+}
+.sp-page-header { max-width: 800px; margin: 0 auto; padding: 32px 40px 24px; }
+.sp-page-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
+.sp-page-date { font-size: 13px; color: #999; margin-bottom: 12px; }
+.sp-page-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0; }
+.sp-page-tag {
+  font-size: 12px; color: #777;
+  padding: 2px 8px;
+  border: 1px solid #ddd;
+}
+.sp-page-content { max-width: 800px; margin: 0 auto; padding: 32px 40px 80px; }
+
+/* Prose */
+.sp-prose h1 { font-size: 26px; font-weight: 700; margin: 2rem 0 0.8rem; }
+.sp-prose h2 { font-size: 22px; font-weight: 700; margin: 2rem 0 0.8rem; }
+.sp-prose h3 { font-size: 18px; font-weight: 600; margin: 1.5rem 0 0.6rem; }
+.sp-prose h4, .sp-prose h5, .sp-prose h6 { font-size: 16px; font-weight: 600; margin: 1.2rem 0 0.5rem; }
+.sp-prose p { font-size: 16px; line-height: 1.8; color: #333; margin: 1rem 0; }
+.sp-prose a { color: #1a1a1a; text-decoration: underline; }
+.sp-prose strong { font-weight: 600; }
+.sp-prose em { font-style: italic; }
+.sp-prose ul { list-style: disc; padding-left: 1.5rem; margin: 0.8rem 0; }
+.sp-prose ol { list-style: decimal; padding-left: 1.5rem; margin: 0.8rem 0; }
+.sp-prose li { font-size: 16px; line-height: 1.8; color: #333; margin: 0.3rem 0; }
+.sp-prose code { background: #f5f5f5; padding: 1px 5px; font-size: 0.875em; font-family: 'SF Mono', Consolas, monospace; }
+.sp-prose pre { background: #f5f5f5; padding: 20px; overflow-x: auto; margin: 1.5rem 0; }
+.sp-prose pre code { background: none; padding: 0; }
+.sp-prose blockquote { border-left: 3px solid #ddd; padding-left: 16px; color: #666; font-style: italic; margin: 1.5rem 0; }
+.sp-prose hr { border: none; border-top: 1px solid #eee; margin: 2rem 0; }
+.sp-prose img { width: 100%; margin: 1.5rem 0; }
+
+@media (max-width: 640px) {
+  .sp-nav { padding: 16px 20px; }
+  .sp-hero { padding: 40px 20px 32px; }
+  .sp-section { padding: 0 20px 60px; }
+  .sp-card { padding: 18px; }
+  .sp-back { padding: 16px 20px 0; }
+  .sp-page-header { padding: 20px 20px 16px; }
+  .sp-page-content { padding: 20px 20px 60px; }
+}
+${CALLOUT_CSS}
+`.trim();
+function buildSimpleIndex(notes, siteTitle) {
+  const cards = notes.map((n) => {
+    var _a, _b;
+    const title = (_a = n.frontmatter.title) != null ? _a : n.slug;
+    const desc = (_b = n.frontmatter.description) != null ? _b : "";
+    const tags = Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [];
+    const tagHtml = tags.map((t) => `<span class="sp-tag">${escapeHtml(t)}</span>`).join("");
+    return `<a href="pages/${n.slug}.html" class="sp-card">
+  <div class="sp-card-title">${escapeHtml(title)}</div>
+  ${desc ? `<div class="sp-card-desc">${escapeHtml(desc)}</div>` : ""}
+  ${tags.length > 0 ? `<div class="sp-card-tags">${tagHtml}</div>` : ""}
+</a>`;
+  }).join("\n");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(siteTitle)}</title>
+  <style>${SIMPLE_CSS}</style>
+</head>
+<body>
+
+<nav class="sp-nav">
+  <a href="index.html" class="sp-nav-logo">${escapeHtml(siteTitle)}</a>
+</nav>
+
+<section class="sp-hero">
+  <h1>${escapeHtml(siteTitle)}</h1>
+  <p>A collection of selected work.</p>
+</section>
+
+<section class="sp-section">
+  <div class="sp-section-heading">Work</div>
+  ${notes.length > 0 ? `<div class="sp-cards">${cards}</div>` : `<p class="sp-empty">No published projects yet.</p>`}
+</section>
+
+<footer class="sp-footer">
+  ${escapeHtml(siteTitle)} &mdash; Built with VaultFolio
+</footer>
+
+</body>
+</html>`;
+  return { path: "index.html", content: html };
+}
+function buildSimplePage(note, siteTitle) {
+  var _a;
+  const title = (_a = note.frontmatter.title) != null ? _a : note.slug;
+  const date = note.frontmatter.date;
+  const tags = Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : [];
+  const tagHtml = tags.map((t) => `<span class="sp-page-tag">${escapeHtml(String(t))}</span>`).join("");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)} \u2014 ${escapeHtml(siteTitle)}</title>
+  <style>${SIMPLE_CSS}</style>
+</head>
+<body>
+
+<a href="../index.html" class="sp-back">&larr; Back</a>
+
+<div class="sp-page-header">
+  <h1>${escapeHtml(title)}</h1>
+  ${date ? `<div class="sp-page-date">${escapeHtml(String(date))}</div>` : ""}
+  ${tags.length > 0 ? `<div class="sp-page-tags">${tagHtml}</div>` : ""}
+</div>
+
+<div class="sp-page-content">
+  <div class="sp-prose">
+    ${markdownToHtml(note.body)}
+  </div>
+</div>
+
+<footer class="sp-footer">
+  ${escapeHtml(siteTitle)} &mdash; Built with VaultFolio
+</footer>
+
+</body>
+</html>`;
+  return { path: `pages/${note.slug}.html`, content: html };
+}
 
 // src/deployer.ts
 async function deploySite(files, config, images) {
@@ -1739,6 +2000,12 @@ async function deploySite(files, config, images) {
   const branch = (_a = config.githubBranch) != null ? _a : "gh-pages";
   try {
     const { commitSha, treeSha } = await getOrCreateBranch(owner, repo, branch, config.githubToken);
+    const existingPaths = await fetchExistingPaths(owner, repo, treeSha, config.githubToken);
+    const newPathSet = /* @__PURE__ */ new Set([
+      ...files.keys(),
+      ...images ? images.keys() : []
+    ]);
+    const stalePaths = findStalePaths(existingPaths, newPathSet);
     const entries = [];
     for (const [path, content] of files) {
       const sha = await createBlob(owner, repo, content, "utf-8", config.githubToken);
@@ -1749,6 +2016,9 @@ async function deploySite(files, config, images) {
         const sha = await createBlob(owner, repo, content, "base64", config.githubToken);
         entries.push({ path, mode: "100644", type: "blob", sha });
       }
+    }
+    for (const path of stalePaths) {
+      entries.push({ path, mode: "100644", type: "blob", sha: null });
     }
     const newTreeSha = await createTree(owner, repo, treeSha, entries, config.githubToken);
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
@@ -1853,6 +2123,22 @@ async function updateRef(owner, repo, branch, commitSha, token) {
   if (!res.ok)
     throw await buildApiError(res, "updating branch ref");
 }
+async function fetchExistingPaths(owner, repo, treeSha, token) {
+  const res = await ghFetch(
+    "GET",
+    `/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`,
+    token
+  );
+  if (!res.ok)
+    return [];
+  const data = await res.json();
+  return data.tree.filter((item) => item.type === "blob").map((item) => item.path);
+}
+function findStalePaths(existingPaths, newPaths) {
+  return existingPaths.filter(
+    (p) => (p.endsWith(".html") || p.startsWith("images/")) && !newPaths.has(p)
+  );
+}
 function ghFetch(method, path, token, body) {
   return fetch(`https://api.github.com${path}`, {
     method,
@@ -1921,7 +2207,7 @@ var VaultFolioSettingsTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     new import_obsidian.Setting(containerEl).setName("Theme").setDesc("Visual theme for the generated site.").addDropdown(
-      (drop) => drop.addOption("default", "Dark Cinematic (Default)").addOption("editorial", "Editorial").addOption("apple", "Apple Minimalist").addOption("swiss", "Minimal Swiss").setValue(this.plugin.settings.theme).onChange(async (value) => {
+      (drop) => drop.addOption("default", "Dark Cinematic (Default)").addOption("editorial", "Editorial").addOption("apple", "Apple Minimalist").addOption("swiss", "Minimal Swiss").addOption("simple", "Simple").setValue(this.plugin.settings.theme).onChange(async (value) => {
         this.plugin.settings.theme = value;
         await this.plugin.saveSettings();
       })
