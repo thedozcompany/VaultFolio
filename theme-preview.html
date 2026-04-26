@@ -185,7 +185,7 @@
   <div class="switcher">
     <button class="switcher-btn" data-theme="simple">Simple</button>
     <button class="switcher-btn" data-theme="apple">Apple</button>
-    <button class="switcher-btn" data-theme="editorial">Editorial</button>
+    <button class="switcher-btn" data-theme="glass">Glassmorphism</button>
     <button class="switcher-btn active" data-theme="dark">Dark Cinematic</button>
   </div>
 </div>
@@ -397,92 +397,107 @@ a{color:inherit;text-decoration:none}
 </body></html>`;
 }
 
-// ── EDITORIAL ────────────────────────────────────────────────────────────────
-function editorialHTML() {
-  const ED_COLORS = ["#F5F4EF","#E8E4DC","#1A1A1A","#F0EBE0"];
-  const cards = PROJECTS.map((p, i) => {
-    const bg = ED_COLORS[i % ED_COLORS.length];
-    const tc = bg === "#1A1A1A" ? "#FFFFFF" : "#0A0A0A";
-    const isFull = i % 3 === 0;
-    return `<a href="#" class="vf-card-ed${isFull ? " full" : ""}" style="text-decoration:none">
-  <div class="vf-card-ed-header" style="background:${bg};color:${tc}">
-    <div class="vf-card-ed-num">NO. ${p.num}</div>
-    <div class="vf-card-ed-title">${p.title}</div>
-    <div class="vf-card-ed-desc">${p.desc}</div>
-    <div class="vf-card-ed-tags">${p.tags.join(" · ").toUpperCase()}</div>
-    <div class="vf-card-ed-link" style="border-bottom:1px solid ${tc}">Read more →</div>
+// ── GLASSMORPHISM ─────────────────────────────────────────────────────────────
+function glassHTML() {
+  const cards = PROJECTS.map(p => `
+<a href="#" class="glass-card" style="text-decoration:none">
+  <div class="glass-card-cover-placeholder"></div>
+  <div class="glass-card-body">
+    <div class="glass-card-title">${p.title}</div>
+    <div class="glass-card-desc">${p.desc}</div>
+    <div class="glass-card-tags">${p.tags.map(t => `<span class="glass-tag">${t}</span>`).join("")}</div>
+    <span class="glass-card-link">Learn more →</span>
   </div>
-</a>`;
-  }).join("\n");
+</a>`).join("\n");
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>${SITE_NAME}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:#fff;color:#0A0A0A;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
+body{background-color:#0D0D1A;background-image:radial-gradient(ellipse at 20% 20%,rgba(124,58,237,0.3) 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,rgba(139,92,246,0.2) 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,rgba(79,70,229,0.1) 0%,transparent 70%);background-attachment:fixed;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
-.vf-nav-ed{background:#fff;border-top:4px solid #0A0A0A;border-bottom:1px solid #0A0A0A;padding:16px 40px;display:flex;justify-content:space-between;align-items:center}
-.vf-nav-ed-logo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:#0A0A0A}
-.vf-nav-ed-left,.vf-nav-ed-right{font-size:13px;font-variant:small-caps;color:#555}
-.vf-hero-ed{background:#fff;padding:60px 40px 32px}
-.vf-hero-ed-title{font-family:'Playfair Display',serif;font-size:clamp(40px,9vw,100px);font-weight:900;letter-spacing:-3px;line-height:0.9;color:#0A0A0A}
-.vf-hero-ed-divider{border-bottom:3px solid #0A0A0A;margin:32px 0}
-.vf-hero-ed-cols{display:flex;gap:40px;justify-content:space-between;align-items:flex-start}
-.vf-hero-ed-bio{font-family:'Playfair Display',serif;font-style:italic;font-size:20px;max-width:560px;line-height:1.4}
-.vf-hero-ed-stats{display:flex;gap:40px;flex-shrink:0}
-.vf-hero-ed-stat{display:flex;flex-direction:column}
-.vf-hero-ed-stat-val{font-family:'Playfair Display',serif;font-size:28px;font-weight:700}
-.vf-hero-ed-stat-lbl{font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#555;margin-top:2px}
-.vf-projects-ed{padding:60px 40px;max-width:1200px;margin:0 auto}
-.vf-projects-ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#0A0A0A;border:1px solid #0A0A0A}
-.vf-card-ed{background:#fff;display:flex;flex-direction:column;text-decoration:none;color:#0A0A0A}
-.vf-card-ed.full{grid-column:1/-1}
-.vf-card-ed-header{padding:36px;min-height:240px;display:flex;flex-direction:column}
-.vf-card-ed-num{font-size:13px;margin-bottom:auto;opacity:0.5}
-.vf-card-ed-title{font-family:'Playfair Display',serif;font-weight:700;font-size:28px;margin-bottom:12px}
-.vf-card-ed-desc{font-size:14px;margin-bottom:16px;opacity:0.8;line-height:1.5}
-.vf-card-ed-tags{text-transform:uppercase;letter-spacing:0.1em;font-size:11px;margin-bottom:20px;opacity:0.6}
-.vf-card-ed-link{font-weight:700;font-size:13px;padding-bottom:2px;align-self:flex-start;display:inline-block}
-.vf-quote-ed{background:#0A0A0A;padding:64px 40px;text-align:center}
-.vf-quote-ed-text{font-family:'Playfair Display',serif;font-size:clamp(22px,3.5vw,44px);font-style:italic;color:#fff}
-.vf-footer-ed{border-top:4px solid #0A0A0A;background:#fff;padding:60px 40px 32px}
-.vf-footer-ed-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;margin-bottom:60px;font-size:14px;color:#555;max-width:1200px;margin:0 auto 48px}
-.vf-footer-ed-cols strong{display:block;color:#0A0A0A;margin-bottom:8px;font-family:'Playfair Display',serif}
-.vf-footer-ed-bottom{text-align:center;font-size:11px;color:#999}
+.vf-nav-gl{position:fixed;top:16px;left:50%;transform:translateX(-50%);width:calc(100% - 48px);max-width:1100px;background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;z-index:100}
+.vf-nav-gl-logo{font-weight:700;font-size:16px;color:#fff}
+.vf-nav-gl-logo span{color:#FF4D00}
+.vf-nav-gl-links{display:flex;gap:28px}
+.vf-nav-gl-link{color:rgba(255,255,255,0.7);font-size:13px}
+.vf-hero-gl{padding:160px 40px 80px;text-align:center;max-width:800px;margin:0 auto}
+.vf-hero-gl-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);border-radius:100px;padding:4px 14px 4px 8px;font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:24px}
+.vf-hero-gl-badge-dot{width:6px;height:6px;border-radius:50%;background:#7C3AED;box-shadow:0 0 8px #7C3AED;flex-shrink:0}
+.vf-hero-gl-title{font-size:clamp(40px,7vw,72px);font-weight:700;letter-spacing:-2px;line-height:1.05;background:linear-gradient(135deg,#fff 0%,rgba(255,255,255,0.7) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:20px}
+.vf-hero-gl-subtitle{font-size:17px;color:rgba(255,255,255,0.5);max-width:500px;margin:0 auto 36px;line-height:1.7}
+.vf-hero-gl-cta-row{display:flex;gap:12px;justify-content:center}
+.vf-hero-gl-btn-primary{background:linear-gradient(135deg,#7C3AED,#5B21B6);border:none;border-radius:12px;padding:12px 28px;color:#fff;font-size:15px;font-weight:500;cursor:pointer;box-shadow:0 0 30px rgba(124,58,237,0.4)}
+.vf-hero-gl-btn-secondary{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 28px;color:rgba(255,255,255,0.8);font-size:15px;cursor:pointer;backdrop-filter:blur(10px)}
+.vf-stats-gl{display:flex;justify-content:center;gap:48px;padding:40px;border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:60px}
+.vf-stat-gl{text-align:center}
+.vf-stat-gl-num{font-size:32px;font-weight:700;color:#fff;display:block}
+.vf-stat-gl-lbl{font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.1em}
+.vf-projects-gl{max-width:1200px;margin:0 auto;padding:0 40px 80px}
+.vf-section-header-gl{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.vf-section-label-gl{font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.4)}
+.projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+.glass-card{background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;transition:all 0.3s ease;cursor:pointer;display:flex;flex-direction:column;color:#fff}
+.glass-card:hover{background:rgba(255,255,255,0.07);border-color:rgba(124,58,237,0.3);transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.glass-card-cover-placeholder{aspect-ratio:16/9;background:linear-gradient(135deg,rgba(124,58,237,0.3),rgba(79,70,229,0.2))}
+.glass-card-body{padding:20px;flex:1;display:flex;flex-direction:column}
+.glass-card-title{font-size:17px;font-weight:600;color:#fff;margin-bottom:8px}
+.glass-card-desc{font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6;margin-bottom:14px}
+.glass-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.glass-tag{background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.3);border-radius:100px;padding:3px 10px;font-size:11px;color:rgba(255,255,255,0.7)}
+.glass-card-link{color:#A78BFA;font-size:13px;margin-top:auto;padding-top:14px;display:inline-flex;align-items:center;gap:4px}
+.vf-about-gl{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:24px;padding:60px 40px;margin:0 40px 60px;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.vf-about-gl-heading{font-size:36px;font-weight:700;color:#fff;margin-bottom:16px;letter-spacing:-1px}
+.vf-about-gl-text{color:rgba(255,255,255,0.5);line-height:1.8;font-size:15px}
+.vf-skills-gl{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.vf-skill-gl{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 14px;color:rgba(255,255,255,0.7);font-size:13px}
+.vf-footer-gl{border-top:1px solid rgba(255,255,255,0.06);padding:32px 40px;display:flex;justify-content:space-between;align-items:center;color:rgba(255,255,255,0.4);font-size:13px;max-width:1200px;margin:0 auto}
+.vf-footer-gl-accent{color:#FF4D00}
 </style></head>
 <body>
-<nav class="vf-nav-ed">
-  <div class="vf-nav-ed-left">April 2026</div>
-  <div class="vf-nav-ed-logo">${SITE_NAME}</div>
-  <div class="vf-nav-ed-right">Vol. 1</div>
+<nav class="vf-nav-gl">
+  <div class="vf-nav-gl-logo">VAULT<span>FOLIO</span></div>
+  <div class="vf-nav-gl-links">
+    <a href="#" class="vf-nav-gl-link">Work</a>
+    <a href="#" class="vf-nav-gl-link">About</a>
+  </div>
 </nav>
-<section class="vf-hero-ed">
-  <h1 class="vf-hero-ed-title">${SITE_NAME}</h1>
-  <div class="vf-hero-ed-divider"></div>
-  <div class="vf-hero-ed-cols">
-    <div class="vf-hero-ed-bio">Brand Designer &amp; Developer crafting digital experiences with intention.</div>
-    <div class="vf-hero-ed-stats">
-      <div class="vf-hero-ed-stat"><span class="vf-hero-ed-stat-val">3</span><span class="vf-hero-ed-stat-lbl">Projects</span></div>
-      <div class="vf-hero-ed-stat"><span class="vf-hero-ed-stat-val">10+</span><span class="vf-hero-ed-stat-lbl">Years</span></div>
+<header class="vf-hero-gl">
+  <div class="vf-hero-gl-badge"><span class="vf-hero-gl-badge-dot"></span>Portfolio — 2026</div>
+  <h1 class="vf-hero-gl-title">${HERO_TITLE}</h1>
+  <p class="vf-hero-gl-subtitle">${HERO_SUBTITLE}</p>
+  <div class="vf-hero-gl-cta-row">
+    <button class="vf-hero-gl-btn-primary">View Work</button>
+    <button class="vf-hero-gl-btn-secondary">About Me</button>
+  </div>
+</header>
+<div class="vf-stats-gl">
+  <div class="vf-stat-gl"><span class="vf-stat-gl-num">3</span><span class="vf-stat-gl-lbl">Projects</span></div>
+  <div class="vf-stat-gl"><span class="vf-stat-gl-num">2026</span><span class="vf-stat-gl-lbl">Active</span></div>
+  <div class="vf-stat-gl"><span class="vf-stat-gl-num">6</span><span class="vf-stat-gl-lbl">Skills</span></div>
+</div>
+<section class="vf-projects-gl">
+  <div class="vf-section-header-gl"><span class="vf-section-label-gl">Selected Work</span></div>
+  <div class="projects-grid">${cards}</div>
+</section>
+<section class="vf-about-gl">
+  <div>
+    <div class="vf-about-gl-heading">About</div>
+    <div class="vf-about-gl-text">A multidisciplinary creator focused on craft, clarity, and impact.</div>
+    <div class="vf-skills-gl">
+      <span class="vf-skill-gl">Branding</span><span class="vf-skill-gl">UI/UX</span>
+      <span class="vf-skill-gl">Motion</span><span class="vf-skill-gl">Product</span>
     </div>
   </div>
-</section>
-<section class="vf-projects-ed">
-  <div class="vf-projects-ed-grid">${cards}</div>
-</section>
-<section class="vf-quote-ed">
-  <p class="vf-quote-ed-text">"Design is the silent ambassador of your brand."</p>
-</section>
-<footer class="vf-footer-ed">
-  <div class="vf-footer-ed-cols">
-    <div><strong>About</strong>Crafting digital experiences with precision and a relentless eye for detail.</div>
-    <div><strong>Links</strong>Instagram<br>Twitter<br>LinkedIn</div>
-    <div><strong>Contact</strong>hello@alexrivera.co</div>
+  <div>
+    <div class="vf-about-gl-text">"The details are not the details. They make the design."</div>
   </div>
-  <div class="vf-footer-ed-bottom">Published with VaultFolio</div>
+</section>
+<footer class="vf-footer-gl">
+  <span>© 2026 ${SITE_NAME}</span>
+  <span>Built with Vault<span class="vf-footer-gl-accent">Folio</span></span>
+  <span>${SITE_NAME}</span>
 </footer>
 </body></html>`;
 }
@@ -540,10 +555,10 @@ a{color:#1a1a1a;text-decoration:none}
 // Switcher logic
 // ─────────────────────────────────────────────────────────────────────────────
 const themeMap = {
-  dark:       darkHTML,
-  apple:      appleHTML,
-  editorial:  editorialHTML,
-  simple:     simpleHTML,
+  dark:   darkHTML,
+  apple:  appleHTML,
+  glass:  glassHTML,
+  simple: simpleHTML,
 };
 
 const frame = document.getElementById("preview-frame");

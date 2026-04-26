@@ -16,7 +16,6 @@ export interface BuildResult {
 
 const CARD_COLORS = ["#1A1A2E", "#16213E", "#1B1B2F", "#0F3460", "#1C1C1E", "#2D1B69"];
 const APPLE_PLACEHOLDER_COLORS = ["#F3EBFF", "#EBF3FF", "#EBFFF3", "#FFF3EB", "#FFEBF3", "#EBEBFF"];
-const SWISS_PLACEHOLDER_COLORS = ["#f0f0f0", "#e8e8e8", "#f5f5f5", "#e0e0e0"];
 const SIMPLE_PLACEHOLDER_COLORS = ["#f8f8f8", "#f0f4f8", "#f8f4f0", "#f0f8f4"];
 
 // ── Callout support (shared across all themes) ────────────────────────────────
@@ -638,18 +637,15 @@ export function buildSite(notes: ParsedNote[], settings: VaultFolioSettings): Bu
   const siteTitle = settings.siteName;
   const theme = settings.theme ?? "apple";
   let pages, index;
-  if (theme === "editorial") {
-    pages = notes.map((note) => buildEditorialPage(note, siteTitle));
-    index = buildEditorialIndex(notes, settings);
-  } else if (theme === "apple") {
+  if (theme === "apple") {
     pages = notes.map((note) => buildApplePage(note, siteTitle));
     index = buildAppleIndex(notes, settings);
-  } else if (theme === "swiss") {
-    pages = notes.map((note) => buildSwissPage(note, siteTitle));
-    index = buildSwissIndex(notes, settings);
   } else if (theme === "simple") {
     pages = notes.map((note) => buildSimplePage(note, siteTitle));
     index = buildSimpleIndex(notes, siteTitle);
+  } else if (theme === "glass") {
+    pages = notes.map((note) => buildGlassPage(note, siteTitle));
+    index = buildGlassIndex(notes, settings);
   } else {
     pages = notes.map((note) => buildPage(note, siteTitle));
     index = buildIndex(notes, settings);
@@ -808,10 +804,9 @@ function renderGalleryScript(): string {
 function renderGalleryCSS(theme: string): string {
   const cfgMap: Record<string, {lc:string;bc:string;bg:string;ac:string;ic:string;ib:string}> = {
     default:   { lc:'rgba(255,255,255,0.4)',  bc:'rgba(255,255,255,0.08)', bg:'#111111', ac:'#FF4D00', ic:'rgba(255,255,255,0.3)', ib:'rgba(255,255,255,0.2)' },
-    editorial: { lc:'#555',  bc:'#D0D0D0', bg:'#F8F8F8', ac:'#0A0A0A', ic:'#999', ib:'#ccc' },
     apple:     { lc:'#6E6E73', bc:'#D2D2D7', bg:'#F5F5F7', ac:'#7C3AED', ic:'#6E6E73', ib:'#D2D2D7' },
-    swiss:     { lc:'#999',  bc:'#E0E0E0', bg:'#F5F5F5', ac:'#0A0A0A', ic:'#999', ib:'#ddd' },
     simple:    { lc:'#999',  bc:'#eee',    bg:'#f9f9f9', ac:'#0A0A0A', ic:'#999', ib:'#ddd' },
+    glass:     { lc:'rgba(255,255,255,0.4)', bc:'rgba(255,255,255,0.08)', bg:'#0D0D1A', ac:'rgba(124,58,237,0.6)', ic:'rgba(255,255,255,0.5)', ib:'rgba(255,255,255,0.1)' },
   };
   const c = cfgMap[theme] ?? cfgMap.simple;
   return `
@@ -1188,428 +1183,6 @@ function parseCallouts(md: string): string {
   return out.join("\n");
 }
 
-// ── EDITORIAL THEME ──────────────────────────────────────────────────────────
-
-const EDITORIAL_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body.vf-editorial {
-  background: #FFFFFF;
-  color: #0A0A0A;
-  font-family: 'DM Sans', sans-serif;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-.vf-editorial a { color: inherit; text-decoration: none; }
-.vf-editorial img { max-width: 100%; height: auto; display: block; margin: 0; }
-.vf-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; margin: 40px 0; }
-.vf-gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
-.vf-gallery img { margin: 0; aspect-ratio: 3/4; object-fit: cover; border-radius: 0; }
-.vf-image-single { display: flex; justify-content: center; margin: 40px 0; }
-
-/* Navigation */
-.vf-nav-ed {
-  background: #FFFFFF;
-  border-top: 4px solid #0A0A0A;
-  border-bottom: 1px solid #0A0A0A;
-  padding: 16px 40px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.vf-nav-ed-logo {
-  font-family: 'Playfair Display', serif;
-  font-size: 24px;
-  font-weight: 700;
-  color: #0A0A0A;
-}
-.vf-nav-ed-left, .vf-nav-ed-right {
-  font-size: 14px;
-  font-variant: small-caps;
-}
-
-/* Hero */
-.vf-hero-ed {
-  background: #FFFFFF;
-  padding: 80px 40px 40px;
-}
-.vf-hero-ed-title {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(48px, 10vw, 120px);
-  font-weight: 900;
-  letter-spacing: -3px;
-  line-height: 0.9;
-  color: #0A0A0A;
-  text-align: left;
-}
-.vf-hero-ed-divider {
-  border-bottom: 3px solid #0A0A0A;
-  margin: 40px 0;
-}
-.vf-hero-ed-cols {
-  display: flex; gap: 40px;
-  justify-content: space-between;
-}
-.vf-hero-ed-bio {
-  font-family: 'Playfair Display', serif;
-  font-style: italic;
-  font-size: 24px;
-  max-width: 600px;
-}
-.vf-hero-ed-stats {
-  display: flex; gap: 40px;
-}
-.vf-hero-ed-stat {
-  display: flex; flex-direction: column;
-}
-.vf-hero-ed-stat-val {
-  font-family: 'Playfair Display', serif;
-  font-size: 32px; font-weight: 700;
-}
-.vf-hero-ed-stat-lbl {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;
-}
-
-/* Projects */
-.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px; }
-.vf-filter-btn { background: transparent; border: 1px solid #0A0A0A; padding: 4px 16px; border-radius: 4px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; }
-.vf-filter-btn:hover { background: rgba(0,0,0,0.05); }
-.vf-filter-btn.active { background: #0A0A0A; color: #FFFFFF; }
-
-.vf-projects-ed {
-  padding: 80px 40px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-.vf-projects-ed-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: #0A0A0A;
-  border: 1px solid #0A0A0A;
-}
-.vf-card-ed {
-  background: #FFFFFF;
-  display: flex; flex-direction: column;
-  position: relative;
-  text-decoration: none;
-  color: #0A0A0A;
-}
-.vf-card-ed.full { grid-column: 1 / -1; }
-.vf-card-ed-header {
-  padding: 40px;
-  min-height: 300px;
-  display: flex; flex-direction: column;
-  border-radius: 0;
-}
-.vf-card-ed-num {
-  font-size: 14px;
-  margin-bottom: auto;
-}
-.vf-card-ed-title {
-  font-family: 'Playfair Display', serif;
-  font-weight: 700;
-  font-size: 32px;
-  margin-bottom: 16px;
-}
-.vf-card-ed-desc {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  margin-bottom: 24px;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-}
-.vf-card-ed-tags {
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 12px;
-  margin-bottom: 24px;
-}
-.vf-card-ed-link {
-  font-weight: 700;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  padding-bottom: 2px;
-  align-self: flex-start;
-}
-
-/* ── Card cover ── */
-.vf-card-ed-cover {
-  width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
-  border-bottom: 1px solid #0A0A0A;
-}
-.vf-card-ed-cover-placeholder {
-  width: 100%; height: 200px;
-  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
-  border-bottom: 1px solid #0A0A0A;
-}
-
-/* Quote */
-.vf-quote-ed {
-  background: #0A0A0A;
-  padding: 80px 40px;
-  text-align: center;
-}
-.vf-quote-ed-text {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(28px, 4vw, 56px);
-  font-style: italic;
-  color: #FFFFFF;
-}
-
-/* Footer */
-.vf-footer-ed {
-  border-top: 4px solid #0A0A0A;
-  background: #FFFFFF;
-  padding: 80px 40px 40px;
-}
-.vf-footer-ed-cols {
-  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px;
-  margin-bottom: 80px;
-  font-family: 'Playfair Display', serif;
-  font-size: 14px; color: #555;
-  max-width: 1200px; margin: 0 auto;
-}
-.vf-footer-ed-bottom {
-  text-align: center; font-size: 11px; color: #999;
-  font-family: 'DM Sans', sans-serif;
-}
-
-/* Project Page */
-.vf-page-ed-header {
-  text-align: center;
-  padding: 80px 40px 40px;
-  border-bottom: 1px solid #0A0A0A;
-  max-width: 1200px; margin: 0 auto;
-}
-.vf-page-ed-issue {
-  font-variant: small-caps; margin-bottom: 24px; color: #555;
-}
-.vf-page-ed-title {
-  font-family: 'Playfair Display', serif; font-size: 72px; font-weight: 900; line-height: 1.1; margin-bottom: 24px;
-}
-.vf-page-ed-meta { font-size: 18px; font-family: 'DM Sans', sans-serif; }
-
-.vf-page-ed-content {
-  max-width: 680px; margin: 0 auto; padding: 80px 40px;
-}
-.vf-prose-ed p {
-  font-size: 18px; line-height: 1.9; margin: 1.5rem 0;
-}
-.vf-prose-ed p:first-of-type::first-letter {
-  float: left; font-family: 'Playfair Display', serif; font-size: 72px; line-height: 60px;
-  padding-right: 8px; font-weight: 900;
-}
-.vf-prose-ed a {
-  color: #0A0A0A; text-decoration: underline;
-}
-.vf-prose-ed strong {
-  font-weight: 700;
-}
-.vf-prose-ed pre, .vf-prose-ed code {
-  background: #F5F4EF;
-  color: #0A0A0A;
-  border-radius: 4px;
-}
-.vf-prose-ed pre { padding: 16px; overflow-x: auto; font-size: 14px; }
-.vf-prose-ed code { padding: 2px 4px; }
-
-.vf-page-ed-tags { display: flex; gap: 8px; margin-top: 60px; }
-.vf-page-ed-tag { font-variant: small-caps; border: 1px solid #0A0A0A; padding: 4px 12px; font-size: 12px; }
-
-.vf-page-ed-back {
-  position: absolute; top: 40px; left: 40px; font-size: 14px; color: #555; text-decoration: none;
-}
-.vf-page-ed-back:hover { color: #0A0A0A; }
-
-@media (max-width: 768px) {
-  .vf-hero-ed-cols { flex-direction: column; }
-  .vf-projects-ed-grid { grid-template-columns: 1fr; }
-  .vf-footer-ed-cols { grid-template-columns: 1fr; }
-  .vf-page-ed-title { font-size: 48px; }
-  .vf-nav-ed-left, .vf-nav-ed-right { display: none; }
-}
-
-/* ── View toggle (editorial) ── */
-.vf-section-header-ed { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.view-toggle-container { display: flex; gap: 6px; align-items: center; }
-.view-toggle-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; background: transparent; border: 1px solid #ccc; transition: all 0.15s ease; }
-.view-toggle-btn svg { fill: #999; display: block; }
-.view-toggle-btn.active { background: #0A0A0A; border-color: #0A0A0A; }
-.view-toggle-btn.active svg { fill: #fff; }
-.projects-grid { transition: all 0.2s ease; }
-/* Grid view */
-#projects-container.view-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #0A0A0A; border: 1px solid #0A0A0A; }
-#projects-container.view-grid .vf-card-ed.full { grid-column: 1 / -1; }
-/* List view */
-#projects-container.view-list { display: flex; flex-direction: column; gap: 0; background: transparent; border: none; }
-#projects-container.view-list .vf-card-ed { flex-direction: row; align-items: center; border-bottom: 1px solid #0A0A0A; transition: background 0.15s ease, padding-left 0.2s ease; }
-#projects-container.view-list .vf-card-ed:hover { background: #f5f5f5; padding-left: 8px; }
-#projects-container.view-list .vf-card-ed.full { grid-column: unset; }
-#projects-container.view-list .vf-card-ed-cover { width: 140px; height: 90px; flex-shrink: 0; aspect-ratio: unset; border-bottom: none; border-right: 1px solid #0A0A0A; object-fit: cover; }
-#projects-container.view-list .vf-card-ed-cover-placeholder { width: 140px; height: 90px; flex-shrink: 0; border-bottom: none; border-right: 1px solid #0A0A0A; }
-#projects-container.view-list .vf-card-ed-header { min-height: unset; padding: 16px 20px; flex: 1; justify-content: center; gap: 6px; }
-#projects-container.view-list .vf-card-ed-num { margin-bottom: 0; }
-#projects-container.view-list .vf-card-ed-title { font-size: 18px; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#projects-container.view-list .vf-card-ed-desc { font-size: 13px; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#projects-container.view-list .vf-card-ed-link { display: none; }
-@media (max-width: 640px) {
-  .view-toggle-container { display: none; }
-  #projects-container.view-grid { grid-template-columns: 1fr; }
-  #projects-container.view-list .vf-card-ed { flex-direction: column; }
-  #projects-container.view-list .vf-card-ed-cover, #projects-container.view-list .vf-card-ed-cover-placeholder { width: 100%; height: 180px; border-right: none; border-bottom: 1px solid #0A0A0A; }
-}
-${CALLOUT_CSS}
-`;
-
-const ED_COLORS = ["#F5F4EF", "#E8E4DC", "#1A1A1A", "#F0EBE0"];
-
-function buildEditorialIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile {
-  const siteTitle = settings.siteName;
-  const rows = notes.map((n, i) => {
-    const num = String(i + 1).padStart(2, "0");
-    const title = n.displayTitle;
-    const desc = getCardDescription(n);
-    const tags = (Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [])
-      .map((t) => String(t).toLowerCase());
-
-    // Pattern: 0(full), 1(half), 2(half), 3(full) ...
-    const isFull = i % 3 === 0;
-    const fullClass = isFull ? " full" : "";
-
-    const bgColor = ED_COLORS[i % ED_COLORS.length];
-    const textColor = bgColor === "#1A1A1A" ? "#FFFFFF" : "#0A0A0A";
-
-    const tagsStr = tags.slice(0, 3).join(" • ");
-
-    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
-    const coverHtml = coverFilename
-      ? `<img class="vf-card-ed-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />`
-      : `<div class="vf-card-ed-cover-placeholder"></div>`;
-
-    return `
-<a href="pages/${n.slug}.html" class="vf-card-ed${fullClass} vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
-  ${coverHtml}
-  <div class="vf-card-ed-header" style="background: ${bgColor}; color: ${textColor};">
-    <div class="vf-card-ed-num">NO. ${num}</div>
-    <div class="vf-card-ed-title">${escapeHtml(title)}</div>
-    ${desc ? `<div class="vf-card-ed-desc">${escapeHtml(desc)}</div>` : ""}
-    ${tagsStr ? `<div class="vf-card-ed-tags">${escapeHtml(tagsStr)}</div>` : ""}
-    <div class="vf-card-ed-link" style="border-bottom-color: ${textColor}">Read more &rarr;</div>
-  </div>
-</a>`;
-  }).join("n");
-
-  const allTags = Array.from(new Set(notes.flatMap(n => Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]).map(t => String(t).toLowerCase()) : []))).sort();
-  const filterHtml = allTags.length > 0 ? `
-    <div class="vf-filter-bar">
-      <button class="vf-filter-btn active" data-filter="all">All</button>
-      ${allTags.map((t: string) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
-    </div>
-  ` : "";
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(siteTitle)} — Editorial</title>
-  <style>${EDITORIAL_CSS}</style>
-</head>
-<body class="vf-editorial">
-
-<nav class="vf-nav-ed">
-  <div class="vf-nav-ed-left">April 2026</div>
-  <div class="vf-nav-ed-logo">${escapeHtml(siteTitle)}</div>
-  <div class="vf-nav-ed-right">Vol. 1</div>
-</nav>
-
-<section class="vf-hero-ed">
-  <h1 class="vf-hero-ed-title">${escapeHtml(siteTitle)}</h1>
-  <div class="vf-hero-ed-divider"></div>
-  <div class="vf-hero-ed-cols">
-    <div class="vf-hero-ed-bio">${escapeHtml(settings.heroSubtitle)}</div>
-    <div class="vf-hero-ed-stats">
-      <div class="vf-hero-ed-stat">
-        <span class="vf-hero-ed-stat-val">${notes.length}</span>
-        <span class="vf-hero-ed-stat-lbl">Projects</span>
-      </div>
-      <div class="vf-hero-ed-stat">
-        <span class="vf-hero-ed-stat-val">10+</span>
-        <span class="vf-hero-ed-stat-lbl">Years</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="vf-projects-ed">
-  <div class="vf-section-header-ed">
-    ${filterHtml}
-    ${renderViewToggle()}
-  </div>
-  <div id="projects-container" class="projects-grid view-grid">
-    ${rows}
-  </div>
-</section>
-
-<section class="vf-quote-ed">
-  <p class="vf-quote-ed-text">${escapeHtml(settings.quoteText)}</p>
-</section>
-
-<footer class="vf-footer-ed">
-  <div class="vf-footer-ed-cols">
-    <div><strong>About</strong><br>Crafting digital experiences with precision, intention, and a relentless eye for detail.</div>
-    <div><strong>Links</strong><br>Instagram<br>Twitter<br>LinkedIn</div>
-    <div><strong>Contact</strong><br>hello@example.com</div>
-  </div>
-  <div class="vf-footer-ed-bottom">Published with VaultFolio</div>
-</footer>
-
-${allTags.length > 0 ? renderTagFilterScript() : ""}
-${renderViewToggleScript()}
-</body>
-</html>`;
-
-  return { path: "index.html", content: html };
-}
-
-function buildEditorialPage(note: ParsedNote, siteTitle: string): SiteFile {
-  const title = note.displayTitle;
-  const date = note.frontmatter.date as string | undefined;
-  const tags = (Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [])
-    .map((t) => String(t).toLowerCase());
-
-  const tagHtml = tags.map(t => `<span class="vf-page-ed-tag">${escapeHtml(t)}</span>`).join("");
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(title)} — ${escapeHtml(siteTitle)}</title>
-  <style>${EDITORIAL_CSS}${renderGalleryCSS('editorial')}</style>
-</head>
-<body class="vf-editorial">
-
-<a href="../index.html" class="vf-page-ed-back">&larr; Back to portfolio</a>
-
-<header class="vf-page-ed-header">
-  <div class="vf-page-ed-issue">Feature Project</div>
-  <h1 class="vf-page-ed-title">${escapeHtml(title)}</h1>
-  <div class="vf-page-ed-meta">${date ? escapeHtml(date) : "Recent Work"}</div>
-</header>
-
-<main class="vf-page-ed-content">
-  ${buildProseWithGallery(note, 'vf-prose-ed')}
-  ${tagHtml ? `<div class="vf-page-ed-tags">${tagHtml}</div>` : ""}
-</main>
-
-${renderLightboxHtml()}
-${renderGalleryScript()}
-</body>
-</html>`;
-  return { path: `pages/${note.slug}.html`, content: html };
-}
 
 // ── APPLE THEME ──────────────────────────────────────────────────────────────
 
@@ -1910,322 +1483,6 @@ ${renderGalleryScript()}
   return { path: `pages/${note.slug}.html`, content: html };
 }
 
-// ── MINIMAL SWISS THEME ──────────────────────────────────────────────────────
-
-const SWISS_CSS = `
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body.vf-swiss {
-  background: #ffffff;
-  color: #000000;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  line-height: 1.4;
-  -webkit-font-smoothing: antialiased;
-}
-.vf-swiss a { color: inherit; text-decoration: none; }
-.vf-swiss img { max-width: 100%; height: auto; display: block; border-radius: 0; }
-
-/* Navigation */
-.vf-nav-sw {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 40px;
-  border-bottom: 1px solid #000;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: -0.02em;
-  font-size: 14px;
-}
-.vf-nav-sw-logo { }
-.vf-nav-sw-right { text-align: right; }
-
-/* Hero */
-.vf-hero-sw {
-  padding: 160px 40px;
-  border-bottom: 1px solid #000;
-}
-.vf-hero-sw-inner {
-  max-width: 1200px;
-}
-.vf-hero-sw-title {
-  font-size: clamp(64px, 12vw, 160px);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 0.85;
-  margin-bottom: 40px;
-}
-.vf-hero-sw-subtitle {
-  font-size: clamp(24px, 4vw, 40px);
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  max-width: 800px;
-}
-
-/* Projects */
-.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; padding: 0 40px; }
-.vf-filter-btn { background: transparent; color: #000; border: none; font-weight: 700; padding: 4px 0; border-bottom: 2px solid transparent; text-transform: uppercase; letter-spacing: -0.02em; font-size: 14px; cursor: pointer; }
-.vf-filter-btn:hover { color: #ff0000; border-bottom-color: #ff0000; }
-.vf-filter-btn.active { border-bottom-color: #000; }
-
-.vf-projects-sw {
-  padding: 0;
-}
-.vf-card-sw {
-  display: grid;
-  grid-template-columns: 80px 80px 1fr 200px;
-  align-items: center;
-  padding: 60px 40px;
-  border-bottom: 1px solid #000;
-  transition: background 0.2s;
-  color: #000;
-}
-.vf-card-sw:hover {
-  background: #f0f0f0;
-}
-.vf-card-sw-num {
-  font-size: 24px;
-  font-weight: 700;
-  color: #ff0000;
-}
-.vf-card-sw-title {
-  font-size: clamp(40px, 6vw, 80px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-.vf-card-sw-right {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right;
-}
-.vf-card-sw-tags {
-  font-size: 12px; font-weight: 700; text-transform: uppercase;
-}
-.vf-card-sw-arrow {
-  color: #ff0000; font-size: 24px; font-weight: 700; margin-top: 16px;
-}
-.vf-card-sw-cover {
-  width: 80px; height: 45px; object-fit: cover; display: block; align-self: center;
-}
-.vf-card-sw-cover-placeholder {
-  width: 80px; height: 45px; align-self: center;
-  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
-}
-
-/* Quote & Footer */
-.vf-quote-sw {
-  padding: 160px 40px;
-  border-bottom: 1px solid #000;
-  text-align: left;
-}
-.vf-quote-sw p {
-  font-size: clamp(32px, 5vw, 64px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  max-width: 1000px;
-}
-.vf-footer-sw {
-  padding: 40px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  font-weight: 700;
-  font-size: 14px;
-  text-transform: uppercase;
-}
-.vf-footer-sw-right { text-align: right; color: #ff0000; }
-
-/* Project Page */
-.vf-page-sw-header {
-  padding: 120px 40px;
-  border-bottom: 1px solid #000;
-}
-.vf-page-sw-title {
-  font-size: clamp(64px, 10vw, 140px);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 0.85;
-  margin-bottom: 24px;
-}
-.vf-page-sw-meta {
-  font-size: 24px; font-weight: 400; color: #ff0000;
-}
-.vf-page-sw-content {
-  padding: 80px 40px; max-width: 900px;
-}
-.vf-prose-sw {
-  font-size: 24px; line-height: 1.5; font-weight: 400; letter-spacing: -0.01em;
-}
-.vf-prose-sw p { margin-bottom: 2rem; }
-.vf-prose-sw h2 { font-size: 48px; font-weight: 700; margin: 4rem 0 2rem; line-height: 1; letter-spacing: -0.03em; }
-.vf-prose-sw h3 { font-size: 32px; font-weight: 700; margin: 3rem 0 1.5rem; line-height: 1; letter-spacing: -0.02em; }
-.vf-prose-sw a { color: #ff0000; border-bottom: 2px solid #ff0000; }
-.vf-prose-sw a:hover { color: #000; border-bottom-color: #000; }
-.vf-prose-sw img { margin: 0; width: 100%; filter: grayscale(100%); transition: filter 0.3s; }
-.vf-prose-sw img:hover { filter: grayscale(0%); }
-.vf-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; border: 1px solid #000; margin: 40px 0; border-bottom: none; }
-.vf-gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
-.vf-gallery img { border-bottom: 1px solid #000; margin: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%); transition: filter 0.3s; }
-.vf-gallery img:nth-child(even) { border-left: 1px solid #000; }
-.vf-gallery img:hover { filter: grayscale(0%); }
-.vf-image-single { display: flex; justify-content: center; margin: 4rem 0; }
-.vf-prose-sw blockquote { border-left: 8px solid #ff0000; padding-left: 2rem; margin: 3rem 0; font-size: 32px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
-.vf-prose-sw pre { background: #f0f0f0; padding: 2rem; font-size: 16px; margin: 2rem 0; }
-
-.vf-back-sw {
-  padding: 20px 40px; border-bottom: 1px solid #000; display: block; font-weight: 700; font-size: 14px; text-transform: uppercase;
-}
-.vf-back-sw:hover { background: #ff0000; color: #fff; }
-
-/* ── View toggle (swiss) ── */
-.vf-section-header-sw { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px 16px; border-bottom: 1px solid #000; }
-.view-toggle-container { display: flex; gap: 6px; align-items: center; }
-.view-toggle-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 0; cursor: pointer; background: transparent; border: 1px solid #ddd; transition: all 0.15s ease; }
-.view-toggle-btn svg { fill: #999; display: block; }
-.view-toggle-btn.active { background: #0A0A0A; border-color: #0A0A0A; }
-.view-toggle-btn.active svg { fill: #fff; }
-.projects-grid { transition: all 0.2s ease; }
-/* List view: existing row layout */
-#projects-container.view-list { display: block; }
-/* Grid view: reflow rows as tiles */
-#projects-container.view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: #000; border-top: 1px solid #000; }
-#projects-container.view-grid .vf-card-sw { display: flex; flex-direction: column; background: #fff; border-bottom: none; padding: 24px; gap: 12px; }
-#projects-container.view-grid .vf-card-sw:hover { background: #f0f0f0; }
-#projects-container.view-grid .vf-card-sw-cover { width: 100%; height: 120px; }
-#projects-container.view-grid .vf-card-sw-cover-placeholder { width: 100%; height: 120px; }
-#projects-container.view-grid .vf-card-sw-num { font-size: 16px; }
-#projects-container.view-grid .vf-card-sw-title { font-size: clamp(24px, 3vw, 36px); }
-#projects-container.view-grid .vf-card-sw-right { flex-direction: row; align-items: center; justify-content: space-between; text-align: left; }
-#projects-container.view-grid .vf-card-sw-arrow { margin-top: 0; }
-@media (max-width: 768px) {
-  .vf-card-sw { grid-template-columns: 1fr; gap: 16px; padding: 40px 24px; }
-  .vf-card-sw-right { align-items: flex-start; text-align: left; }
-  .vf-card-sw-cover, .vf-card-sw-cover-placeholder { display: none; }
-  .vf-nav-sw, .vf-footer-sw { padding: 24px; }
-  .vf-hero-sw, .vf-quote-sw, .vf-page-sw-header { padding: 80px 24px; }
-  .view-toggle-container { display: none; }
-  #projects-container.view-grid { grid-template-columns: 1fr; }
-}
-${CALLOUT_CSS}
-`;
-
-function buildSwissIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile {
-  const siteTitle = settings.siteName;
-  const rows = notes.map((n, i) => {
-    const num = String(i + 1).padStart(2, "0");
-    const title = n.displayTitle;
-    const tags = (Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [])
-      .map((t) => String(t).toLowerCase());
-
-    const tagsStr = tags.slice(0, 3).join(" / ");
-
-    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
-    const coverHtml = coverFilename
-      ? `<img class="vf-card-sw-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />`
-      : `<div class="vf-card-sw-cover-placeholder"></div>`;
-
-    return `
-<a href="pages/${n.slug}.html" class="vf-card-sw vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
-  <div class="vf-card-sw-num">${num}</div>
-  ${coverHtml}
-  <div class="vf-card-sw-title">${escapeHtml(title)}</div>
-  <div class="vf-card-sw-right">
-    ${tagsStr ? `<div class="vf-card-sw-tags">${escapeHtml(tagsStr)}</div>` : ""}
-    <div class="vf-card-sw-arrow">&rarr;</div>
-  </div>
-</a>`;
-  }).join("\n");
-
-  const allTags = Array.from(new Set(notes.flatMap(n => Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]).map(t => String(t).toLowerCase()) : []))).sort();
-  const filterHtml = allTags.length > 0 ? `
-    <div class="vf-filter-bar">
-      <button class="vf-filter-btn active" data-filter="all" style="margin-right: 16px;">All</button>
-      ${allTags.map((t: string) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
-    </div>
-  ` : "";
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(siteTitle)} — Swiss</title>
-  <style>${SWISS_CSS}</style>
-</head>
-<body class="vf-swiss">
-
-<nav class="vf-nav-sw">
-  <div class="vf-nav-sw-logo">${escapeHtml(siteTitle)}</div>
-  <div class="vf-nav-sw-right">Portfolio</div>
-</nav>
-
-<header class="vf-hero-sw">
-  <div class="vf-hero-sw-inner">
-    <h1 class="vf-hero-sw-title">${escapeHtml(siteTitle)}</h1>
-    <p class="vf-hero-sw-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
-  </div>
-</header>
-
-<section class="vf-projects-sw">
-  <div class="vf-section-header-sw">
-    ${renderViewToggle()}
-  </div>
-  ${filterHtml}
-  <div id="projects-container" class="projects-grid view-grid">
-    ${rows}
-  </div>
-</section>
-
-<section class="vf-quote-sw">
-  <p>${escapeHtml(settings.quoteText)}</p>
-</section>
-
-<footer class="vf-footer-sw">
-  <div>&copy; 2026 ${escapeHtml(siteTitle)}</div>
-  <div class="vf-footer-sw-right">Built with VaultFolio</div>
-</footer>
-
-${allTags.length > 0 ? renderTagFilterScript() : ""}
-${renderViewToggleScript()}
-</body>
-</html>`;
-  return { path: "index.html", content: html };
-}
-
-function buildSwissPage(note: ParsedNote, siteTitle: string): SiteFile {
-  const title = note.displayTitle;
-  const date = note.frontmatter.date as string | undefined;
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(title)} - ${escapeHtml(siteTitle)}</title>
-  <style>${SWISS_CSS}${renderGalleryCSS('swiss')}</style>
-</head>
-<body class="vf-swiss">
-
-<a href="../index.html" class="vf-back-sw">&larr; Return to Index</a>
-
-<header class="vf-page-sw-header">
-  <h1 class="vf-page-sw-title">${escapeHtml(title)}</h1>
-  <div class="vf-page-sw-meta">${date ? escapeHtml(date) : "Project"}</div>
-</header>
-
-<main class="vf-page-sw-content">
-  ${buildProseWithGallery(note, 'vf-prose-sw')}
-</main>
-
-<footer class="vf-footer-sw" style="border-top: 1px solid #000;">
-  <div>${escapeHtml(title)}</div>
-  <div class="vf-footer-sw-right">&copy; 2026</div>
-</footer>
-
-${renderLightboxHtml()}
-${renderGalleryScript()}
-</body>
-</html>`;
-  return { path: `pages/${note.slug}.html`, content: html };
-}
-
 // ════════════════════════════════════════════════════════════════════════════
 // THEME: SIMPLE
 // ════════════════════════════════════════════════════════════════════════════
@@ -2487,3 +1744,446 @@ ${renderGalleryScript()}
 
   return { path: `pages/${note.slug}.html`, content: html };
 }
+
+// ── GLASSMORPHISM THEME ───────────────────────────────────────────────────────
+
+const GLASS_CSS = `
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body.vf-glass {
+  background-color: #0D0D1A;
+  background-image:
+    radial-gradient(ellipse at 20% 20%, rgba(124,58,237,0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(139,92,246,0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(79,70,229,0.1) 0%, transparent 70%);
+  background-attachment: fixed;
+  color: #FFFFFF;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+.vf-glass a { color: inherit; text-decoration: none; }
+.vf-glass img { max-width: 100%; height: auto; display: block; }
+
+/* ── Navigation ── */
+.vf-nav-gl {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  width: calc(100% - 48px); max-width: 1100px;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px; padding: 12px 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  z-index: 100;
+}
+.vf-nav-gl-logo { font-weight: 700; font-size: 16px; color: #fff; }
+.vf-nav-gl-logo span { color: #FF4D00; }
+.vf-nav-gl-links { display: flex; gap: 28px; align-items: center; }
+.vf-nav-gl-link { color: rgba(255,255,255,0.7); font-size: 13px; transition: color 0.2s; }
+.vf-nav-gl-link:hover { color: #fff; }
+.vf-nav-gl-cta {
+  background: rgba(124,58,237,0.6);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(124,58,237,0.4); border-radius: 8px; padding: 7px 18px;
+  color: white; font-size: 13px; font-family: inherit; cursor: pointer; transition: background 0.2s;
+}
+.vf-nav-gl-cta:hover { background: rgba(124,58,237,0.8); }
+
+/* ── Hero ── */
+.vf-hero-gl { padding: 160px 40px 80px; text-align: center; max-width: 800px; margin: 0 auto; }
+.vf-hero-gl-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.4);
+  border-radius: 100px; padding: 4px 14px 4px 8px;
+  font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 24px;
+}
+.vf-hero-gl-badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #7C3AED; box-shadow: 0 0 8px #7C3AED; flex-shrink: 0;
+}
+.vf-hero-gl-title {
+  font-size: clamp(40px, 7vw, 72px); font-weight: 700;
+  letter-spacing: -2px; line-height: 1.05;
+  background: linear-gradient(135deg, #FFFFFF 0%, rgba(255,255,255,0.7) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 20px;
+}
+.vf-hero-gl-subtitle {
+  font-size: 17px; color: rgba(255,255,255,0.5);
+  max-width: 500px; margin: 0 auto 36px; line-height: 1.7;
+}
+.vf-hero-gl-cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.vf-hero-gl-btn-primary {
+  background: linear-gradient(135deg, #7C3AED, #5B21B6);
+  border: none; border-radius: 12px; padding: 12px 28px;
+  color: white; font-size: 15px; font-weight: 500; font-family: inherit; cursor: pointer;
+  box-shadow: 0 0 30px rgba(124,58,237,0.4); transition: box-shadow 0.3s ease;
+}
+.vf-hero-gl-btn-primary:hover { box-shadow: 0 0 40px rgba(124,58,237,0.6); }
+.vf-hero-gl-btn-secondary {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px; padding: 12px 28px; color: rgba(255,255,255,0.8);
+  font-size: 15px; font-family: inherit; cursor: pointer;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background 0.2s;
+}
+.vf-hero-gl-btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+/* ── Stats ── */
+.vf-stats-gl {
+  display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; padding: 40px;
+  border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 60px;
+}
+.vf-stat-gl { text-align: center; }
+.vf-stat-gl-num { font-size: 32px; font-weight: 700; color: #fff; display: block; }
+.vf-stat-gl-lbl { font-size: 12px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* ── Projects section ── */
+.vf-projects-gl { max-width: 1200px; margin: 0 auto; padding: 0 40px 80px; }
+.vf-section-header-gl {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.vf-section-label-gl {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+  text-transform: uppercase; color: rgba(255,255,255,0.4);
+}
+
+/* ── View toggle ── */
+.view-toggle-container { display: flex; gap: 6px; align-items: center; }
+.view-toggle-btn {
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; cursor: pointer;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); transition: all 0.15s ease;
+}
+.view-toggle-btn svg { fill: rgba(255,255,255,0.5); display: block; }
+.view-toggle-btn.active { background: rgba(124,58,237,0.6); border-color: rgba(124,58,237,0.4); }
+.view-toggle-btn.active svg { fill: #fff; }
+
+/* ── Glass cards ── */
+.glass-card {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; overflow: hidden;
+  transition: all 0.3s ease; cursor: pointer; display: flex; flex-direction: column;
+  text-decoration: none; color: inherit;
+}
+.glass-card:hover {
+  background: rgba(255,255,255,0.07); border-color: rgba(124,58,237,0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(124,58,237,0.1);
+}
+.glass-card-cover { aspect-ratio: 16/9; overflow: hidden; }
+.glass-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.glass-card-cover-placeholder {
+  aspect-ratio: 16/9;
+  background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2));
+  display: flex; align-items: center; justify-content: center;
+}
+.glass-card-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+.glass-card-title { font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.glass-card-desc {
+  font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.6; margin-bottom: 14px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.glass-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.glass-tag {
+  background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.3);
+  border-radius: 100px; padding: 3px 10px; font-size: 11px; color: rgba(255,255,255,0.7);
+}
+.glass-card-link {
+  color: #A78BFA; font-size: 13px; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px; margin-top: auto; padding-top: 14px;
+  transition: color 0.2s;
+}
+.glass-card-link:hover { color: #fff; }
+
+/* ── Grid / list layout ── */
+#projects-container.view-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;
+}
+#projects-container.view-list { display: flex; flex-direction: column; gap: 8px; }
+#projects-container.view-list .glass-card {
+  flex-direction: row; border-radius: 12px; padding: 16px;
+  background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06);
+}
+#projects-container.view-list .glass-card:hover {
+  background: rgba(255,255,255,0.06); border-color: rgba(124,58,237,0.2);
+  transform: none; box-shadow: none;
+}
+#projects-container.view-list .glass-card-cover,
+#projects-container.view-list .glass-card-cover-placeholder {
+  width: 120px; height: 80px; aspect-ratio: unset; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+}
+#projects-container.view-list .glass-card-body { padding: 0 0 0 16px; }
+#projects-container.view-list .glass-card-title { font-size: 15px; }
+#projects-container.view-list .glass-card-link { display: none; }
+
+/* ── Tag filter ── */
+.vf-filter-bar-gl { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.vf-filter-btn-gl {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 100px; padding: 6px 16px; font-size: 13px; color: rgba(255,255,255,0.6);
+  font-family: inherit; cursor: pointer; transition: all 0.2s;
+}
+.vf-filter-btn-gl:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.vf-filter-btn-gl.active { background: rgba(124,58,237,0.4); border-color: rgba(124,58,237,0.5); color: #fff; }
+
+/* ── About ── */
+.vf-about-gl {
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 24px; padding: 60px 40px; margin: 0 40px 60px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
+}
+.vf-about-gl-heading { font-size: 36px; font-weight: 700; color: #fff; margin-bottom: 16px; letter-spacing: -1px; }
+.vf-about-gl-text { color: rgba(255,255,255,0.5); line-height: 1.8; font-size: 15px; }
+.vf-skills-gl { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.vf-skill-gl {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; padding: 6px 14px; color: rgba(255,255,255,0.7); font-size: 13px;
+}
+
+/* ── Footer ── */
+.vf-footer-gl {
+  border-top: 1px solid rgba(255,255,255,0.06); padding: 32px 40px;
+  display: flex; justify-content: space-between; align-items: center;
+  color: rgba(255,255,255,0.4); font-size: 13px; max-width: 1200px; margin: 0 auto;
+}
+.vf-footer-gl-accent { color: #FF4D00; }
+
+/* ── Project page ── */
+.vf-page-gl { max-width: 800px; margin: 0 auto; padding: 120px 40px 80px; }
+.vf-back-gl {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 100px; padding: 8px 16px; color: rgba(255,255,255,0.7);
+  font-size: 14px; margin-bottom: 40px; transition: background 0.2s;
+}
+.vf-back-gl:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.vf-page-gl-title {
+  font-size: clamp(36px, 6vw, 64px); font-weight: 700; color: #fff;
+  letter-spacing: -1.5px; margin-bottom: 16px; line-height: 1.05;
+}
+.vf-page-gl-meta { font-size: 14px; color: rgba(255,255,255,0.4); margin-bottom: 16px; }
+.vf-page-gl-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 32px; }
+.vf-page-gl-content {
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px; padding: 40px; margin-top: 32px;
+  color: rgba(255,255,255,0.8); font-size: 16px; line-height: 1.9;
+}
+.vf-prose-gl p { margin-bottom: 1.5rem; }
+.vf-prose-gl h2, .vf-prose-gl h3 {
+  color: #fff; font-weight: 600; letter-spacing: -0.5px; margin-top: 2.5rem; margin-bottom: 1rem;
+}
+.vf-prose-gl h2 { font-size: 28px; }
+.vf-prose-gl h3 { font-size: 22px; }
+.vf-prose-gl a { color: #A78BFA; }
+.vf-prose-gl a:hover { color: #fff; }
+.vf-prose-gl pre, .vf-prose-gl code {
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9);
+  border-radius: 8px; font-family: ui-monospace, Menlo, Monaco, monospace;
+}
+.vf-prose-gl pre { padding: 20px; overflow-x: auto; font-size: 14px; margin: 2rem 0; }
+.vf-prose-gl code { padding: 3px 6px; font-size: 0.9em; }
+.vf-prose-gl blockquote {
+  border-left: 3px solid rgba(124,58,237,0.8); padding-left: 1.5rem;
+  color: rgba(255,255,255,0.5); margin: 2rem 0; font-style: italic;
+}
+.vf-prose-gl hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 3rem 0; }
+.vf-prose-gl .callout {
+  background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.1) !important;
+  border-left: 3px solid rgba(124,58,237,0.8) !important; border-radius: 0 8px 8px 0 !important;
+  padding: 12px 16px !important; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+
+/* ── Gallery overrides ── */
+.vf-gallery img { border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.vf-image-single { display: flex; justify-content: center; margin: 2rem 0; }
+
+@media (max-width: 768px) {
+  .vf-nav-gl { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .glass-card { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .vf-about-gl { grid-template-columns: 1fr; margin: 0 16px 40px; }
+  .vf-projects-gl { padding: 0 16px 60px; }
+  .vf-hero-gl { padding: 120px 24px 60px; }
+  #projects-container.view-list .glass-card-cover,
+  #projects-container.view-list .glass-card-cover-placeholder { display: none; }
+}
+@media (max-width: 640px) {
+  .view-toggle-container { display: none; }
+  #projects-container.view-grid { grid-template-columns: 1fr; }
+}
+${CALLOUT_CSS}
+`;
+
+function buildGlassIndex(notes: ParsedNote[], settings: VaultFolioSettings): SiteFile {
+  const siteTitle = settings.siteName;
+
+  const cards = notes.map((n) => {
+    const title = n.displayTitle;
+    const desc = getCardDescription(n);
+    const tags = (Array.isArray(n.frontmatter.tags) ? (n.frontmatter.tags as string[]) : [])
+      .map((t) => String(t).toLowerCase());
+    const tagHtml = tags.slice(0, 3).map(t => `<span class="glass-tag">${escapeHtml(t)}</span>`).join("");
+    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
+    const coverHtml = coverFilename
+      ? `<div class="glass-card-cover"><img src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" /></div>`
+      : `<div class="glass-card-cover-placeholder"></div>`;
+    return `
+<a href="pages/${n.slug}.html" class="glass-card vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
+  ${coverHtml}
+  <div class="glass-card-body">
+    <div class="glass-card-title">${escapeHtml(title)}</div>
+    ${desc ? `<div class="glass-card-desc">${escapeHtml(desc)}</div>` : ""}
+    ${tagHtml ? `<div class="glass-card-tags">${tagHtml}</div>` : ""}
+    <span class="glass-card-link">Learn more →</span>
+  </div>
+</a>`;
+  }).join("\n");
+
+  const allTags = Array.from(new Set(
+    notes.flatMap(n => Array.isArray(n.frontmatter.tags)
+      ? (n.frontmatter.tags as string[]).map(t => String(t).toLowerCase())
+      : [])
+  )).sort();
+
+  const filterHtml = allTags.length > 0 ? `
+<div class="vf-filter-bar-gl">
+  <button class="vf-filter-btn-gl active" data-filter="all">All</button>
+  ${allTags.map((t: string) => `<button class="vf-filter-btn-gl" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+</div>` : "";
+
+  const navLinks = settings.navLinks.split(",").map(entry => {
+    const parts = entry.trim().split(":");
+    const label = parts[0].trim();
+    const rawHref = parts.slice(1).join(":").trim();
+    if (!label || !rawHref) return "";
+    const fullHref = normalizeNavHref(rawHref);
+    const isExternal = /^https?:\/\//.test(fullHref);
+    const targetAttr = isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
+    return `<a href="${escapeHtml(fullHref)}" class="vf-nav-gl-link"${targetAttr}>${escapeHtml(label)}</a>`;
+  }).filter(Boolean).join("\n    ");
+
+  const uniqueTagCount = new Set(
+    notes.flatMap(n => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [])
+  ).size;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(siteTitle)}</title>
+  <style>${GLASS_CSS}</style>
+</head>
+<body class="vf-glass">
+
+<nav class="vf-nav-gl">
+  <div class="vf-nav-gl-logo">VAULT<span>FOLIO</span></div>
+  <div class="vf-nav-gl-links">
+    ${navLinks}
+  </div>
+</nav>
+
+<header class="vf-hero-gl">
+  <div class="vf-hero-gl-badge">
+    <span class="vf-hero-gl-badge-dot"></span>
+    Portfolio — ${new Date().getFullYear()}
+  </div>
+  <h1 class="vf-hero-gl-title">${escapeHtml(settings.heroTitle)}</h1>
+  <p class="vf-hero-gl-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
+  <div class="vf-hero-gl-cta-row">
+    <button class="vf-hero-gl-btn-primary" onclick="document.getElementById('work').scrollIntoView({behavior:'smooth'})">View Work</button>
+    <button class="vf-hero-gl-btn-secondary" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">About Me</button>
+  </div>
+</header>
+
+<div class="vf-stats-gl">
+  <div class="vf-stat-gl">
+    <span class="vf-stat-gl-num">${notes.length}</span>
+    <span class="vf-stat-gl-lbl">Projects</span>
+  </div>
+  <div class="vf-stat-gl">
+    <span class="vf-stat-gl-num">${new Date().getFullYear()}</span>
+    <span class="vf-stat-gl-lbl">Active</span>
+  </div>
+  <div class="vf-stat-gl">
+    <span class="vf-stat-gl-num">${uniqueTagCount}</span>
+    <span class="vf-stat-gl-lbl">Skills</span>
+  </div>
+</div>
+
+<section id="work" class="vf-projects-gl">
+  <div class="vf-section-header-gl">
+    <span class="vf-section-label-gl">Selected Work</span>
+    ${renderViewToggle()}
+  </div>
+  ${filterHtml}
+  <div id="projects-container" class="view-grid">
+    ${cards}
+  </div>
+</section>
+
+<section id="about" class="vf-about-gl">
+  <div>
+    <div class="vf-about-gl-heading">About</div>
+    <div class="vf-about-gl-text">${escapeHtml(settings.aboutText)}</div>
+  </div>
+  <div>
+    <div class="vf-about-gl-text">${escapeHtml(settings.quoteText)}</div>
+    <div class="vf-skills-gl">
+      ${allTags.slice(0, 8).map((s: string) => `<span class="vf-skill-gl">${escapeHtml(s)}</span>`).join("")}
+    </div>
+  </div>
+</section>
+
+<footer class="vf-footer-gl">
+  <span>© ${new Date().getFullYear()} ${escapeHtml(siteTitle)}</span>
+  <span>Built with Vault<span class="vf-footer-gl-accent">Folio</span></span>
+  <span>${escapeHtml(siteTitle)}</span>
+</footer>
+
+${allTags.length > 0 ? renderTagFilterScript().replace(/vf-filter-btn\b/g, "vf-filter-btn-gl") : ""}
+${renderViewToggleScript()}
+</body>
+</html>`;
+
+  return { path: "index.html", content: html };
+}
+
+function buildGlassPage(note: ParsedNote, siteTitle: string): SiteFile {
+  const title = note.displayTitle;
+  const date = note.frontmatter.date as string | undefined;
+  const tags = (Array.isArray(note.frontmatter.tags) ? (note.frontmatter.tags as string[]) : [])
+    .map((t) => String(t).toLowerCase());
+  const tagHtml = tags.map(t => `<span class="glass-tag">${escapeHtml(t)}</span>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)} — ${escapeHtml(siteTitle)}</title>
+  <style>${GLASS_CSS}${renderGalleryCSS('glass')}</style>
+</head>
+<body class="vf-glass">
+
+<div class="vf-page-gl">
+  <a href="../index.html" class="vf-back-gl">← Back</a>
+
+  <h1 class="vf-page-gl-title">${escapeHtml(title)}</h1>
+  ${date ? `<div class="vf-page-gl-meta">${escapeHtml(String(date))}</div>` : ""}
+  ${tags.length > 0 ? `<div class="vf-page-gl-tags">${tagHtml}</div>` : ""}
+
+  <div class="vf-page-gl-content">
+    ${buildProseWithGallery(note, 'vf-prose-gl')}
+  </div>
+</div>
+
+${renderLightboxHtml()}
+${renderGalleryScript()}
+</body>
+</html>`;
+
+  return { path: `pages/${note.slug}.html`, content: html };
+}
+
