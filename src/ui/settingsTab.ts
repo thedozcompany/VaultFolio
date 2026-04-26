@@ -63,10 +63,9 @@ export class VaultFolioSettingsTab extends PluginSettingTab {
       .addDropdown((drop) =>
         drop
           .addOption("default", "Dark Cinematic (Default)")
-          .addOption("editorial", "Editorial")
           .addOption("apple", "Apple Minimalist")
-          .addOption("swiss", "Minimal Swiss")
           .addOption("simple", "Simple")
+          .addOption("glass", "Glassmorphism")
           .setValue(this.plugin.settings.theme)
           .onChange(async (value) => {
             this.plugin.settings.theme = value;
