@@ -52,20 +52,43 @@ var Parser = class {
     this.settings = settings;
   }
   async getPublishedNotes() {
-    var _a;
+    var _a, _b, _c;
     const folder = this.settings.portfolioFolder.replace(/\/+$/, "");
     const markdownFiles = this.app.vault.getMarkdownFiles().filter(
       (f) => f.path === `${folder}/${f.name}` || f.path.startsWith(`${folder}/`)
     );
     const published = [];
     for (const file of markdownFiles) {
-      const cache = this.app.metadataCache.getFileCache(file);
-      const frontmatter = (_a = cache == null ? void 0 : cache.frontmatter) != null ? _a : {};
-      if (frontmatter.published !== true)
-        continue;
-      const content = await this.app.vault.read(file);
-      const title = typeof frontmatter.title === "string" && frontmatter.title.trim() ? frontmatter.title.trim() : file.basename;
-      published.push({ path: file.path, title, frontmatter, content, imageRefs: extractImageRefs(content) });
+      try {
+        const content = await this.app.vault.read(file);
+        const cache = this.app.metadataCache.getFileCache(file);
+        const cachedFm = cache == null ? void 0 : cache.frontmatter;
+        const frontmatter = {
+          ...cachedFm != null ? cachedFm : extractFrontmatterFromContent(content)
+        };
+        if (Array.isArray(frontmatter.tags)) {
+          frontmatter.tags = frontmatter.tags.map((t) => String(t).toLowerCase());
+        }
+        const rawCover = frontmatter.cover;
+        if (rawCover != null && typeof rawCover !== "string") {
+          const obj = rawCover;
+          frontmatter.cover = String(
+            (_c = (_b = (_a = obj.path) != null ? _a : obj.link) != null ? _b : obj.displayText) != null ? _c : rawCover
+          );
+        }
+        if (frontmatter.published !== true)
+          continue;
+        const title = typeof frontmatter.title === "string" && frontmatter.title.trim() ? frontmatter.title.trim() : file.basename;
+        published.push({
+          path: file.path,
+          title,
+          frontmatter,
+          content,
+          imageRefs: extractImageRefs(content)
+        });
+      } catch (err) {
+        console.warn(`VaultFolio: skipping "${file.path}" \u2014 ${err}`);
+      }
     }
     return published;
   }
@@ -73,14 +96,16 @@ var Parser = class {
 async function getPublishedNotes(app, portfolioFolder) {
   return new Parser(app, { portfolioFolder }).getPublishedNotes();
 }
-function parseNote(rawContent, fallbackSlug) {
-  var _a, _b;
-  const frontmatter = extractFrontmatter(rawContent);
+function parseNote(rawContent, fallbackSlug, cachedFrontmatter) {
+  var _a, _b, _c, _d;
+  const frontmatter = cachedFrontmatter != null ? cachedFrontmatter : extractFrontmatterFromContent(rawContent);
   const body = stripFrontmatter(rawContent);
   const slug = (_b = frontmatter.slug) != null ? _b : slugify((_a = frontmatter.title) != null ? _a : fallbackSlug);
-  return { frontmatter, body, slug };
+  const basename = (_d = (_c = fallbackSlug.split("/").pop()) == null ? void 0 : _c.replace(/\.md$/i, "")) != null ? _d : fallbackSlug;
+  const displayTitle = typeof frontmatter.title === "string" && frontmatter.title.trim() ? frontmatter.title.trim() : basename;
+  return { frontmatter, body, slug, displayTitle };
 }
-function extractFrontmatter(content) {
+function extractFrontmatterFromContent(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match)
     return {};
@@ -91,7 +116,7 @@ function extractFrontmatter(content) {
   return fm;
 }
 function stripFrontmatter(content) {
-  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
+  return content.replace(/^﻿/, "").replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
 }
 function parseYamlSimple(yaml) {
   const result = {};
@@ -113,7 +138,7 @@ function parseYamlSimple(yaml) {
       if (value === "") {
         result[currentKey] = [];
         inArray = true;
-      } else if (value.startsWith("[")) {
+      } else if (value.startsWith("[") && !value.startsWith("[[")) {
         result[currentKey] = value.replace(/^\[|\]$/g, "").split(",").map((s) => s.trim().replace(/^["']|["']$/g, ""));
         inArray = false;
       } else {
@@ -308,7 +333,7 @@ img { max-width: 100%; height: auto; display: block; }
 /* \u2500\u2500 Project row \u2500\u2500 */
 .vf-project-row {
   display: grid;
-  grid-template-columns: 60px 1fr auto;
+  grid-template-columns: 60px 80px 1fr auto;
   align-items: center;
   gap: 40px;
   padding: 40px 0;
@@ -359,6 +384,18 @@ img { max-width: 100%; height: auto; display: block; }
 .vf-no-projects {
   font-size: 16px; color: rgba(255,255,255,0.3);
   padding: 60px 0;
+}
+
+/* \u2500\u2500 Row cover thumbnail \u2500\u2500 */
+.vf-project-row-cover {
+  width: 80px; height: 45px;
+  border-radius: 4px; object-fit: cover; display: block;
+  flex-shrink: 0; align-self: center;
+}
+.vf-project-row-cover-placeholder {
+  width: 80px; height: 45px; border-radius: 4px;
+  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
+  flex-shrink: 0; align-self: center;
 }
 
 /* \u2500\u2500 Filters \u2500\u2500 */
@@ -581,6 +618,7 @@ img { max-width: 100%; height: auto; display: block; }
     padding-right: 12px;
   }
   .vf-project-meta-right { display: none; }
+  .vf-project-row-cover, .vf-project-row-cover-placeholder { display: none; }
   .vf-project-name { font-size: clamp(22px, 6vw, 36px); letter-spacing: -1px; }
 
   .vf-about { padding: 80px 24px; }
@@ -593,6 +631,42 @@ img { max-width: 100%; height: auto; display: block; }
 
   .vf-project-content { padding: 60px 24px 80px; }
   .vf-prose p, .vf-prose li { font-size: 16px; }
+}
+
+/* \u2500\u2500 View toggle (dark cinematic) \u2500\u2500 */
+.vf-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 60px; }
+.vf-section-header .vf-section-label { margin-bottom: 0; display: inline; }
+.view-toggle-container { display: flex; gap: 6px; align-items: center; }
+.view-toggle-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; background: transparent; border: 1px solid rgba(255,255,255,0.2); transition: all 0.15s ease; }
+.view-toggle-btn svg { fill: rgba(255,255,255,0.4); display: block; }
+.view-toggle-btn.active { background: #FF4D00; border-color: #FF4D00; }
+.view-toggle-btn.active svg { fill: #fff; }
+.projects-grid { transition: all 0.2s ease; }
+/* Grid view */
+#projects-container.view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+#projects-container.view-grid .vf-project-row { display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; margin: 0; padding: 0; overflow: hidden; background: #111; }
+#projects-container.view-grid .vf-project-row:first-child { border-top: 1px solid rgba(255,255,255,0.1); }
+#projects-container.view-grid .vf-project-row-cover { width: 100%; aspect-ratio: 16/9; height: auto; border-radius: 0; flex-shrink: unset; align-self: unset; }
+#projects-container.view-grid .vf-project-row-cover-placeholder { width: 100%; height: 160px; border-radius: 0; flex-shrink: unset; align-self: unset; }
+#projects-container.view-grid .vf-project-num { display: none; }
+#projects-container.view-grid .vf-project-name { font-size: 20px; padding: 16px 16px 8px; letter-spacing: -0.5px; }
+#projects-container.view-grid .vf-project-meta-right { flex-direction: row; justify-content: flex-start; padding: 0 16px 16px; }
+#projects-container.view-grid .vf-project-year { display: none; }
+/* List view */
+#projects-container.view-list { display: flex; flex-direction: column; gap: 0; }
+#projects-container.view-list .vf-project-row { flex-direction: row; align-items: center; gap: 20px; padding: 20px 0; border-top: none; border-bottom: 1px solid rgba(255,255,255,0.08); margin: 0; background: transparent; overflow: visible; }
+#projects-container.view-list .vf-project-row:hover { background: rgba(255,255,255,0.03); padding-left: 8px; }
+#projects-container.view-list .vf-project-row-cover { width: 140px; height: 90px; flex-shrink: 0; border-radius: 8px; object-fit: cover; aspect-ratio: unset; align-self: auto; }
+#projects-container.view-list .vf-project-row-cover-placeholder { width: 140px; height: 90px; flex-shrink: 0; border-radius: 8px; background: linear-gradient(135deg, #1a1a1a, #333); }
+#projects-container.view-list .vf-project-num { display: none; }
+#projects-container.view-list .vf-project-name { font-size: 18px; font-weight: 600; padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#projects-container.view-list .vf-project-meta-right { flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; flex: 1; }
+#projects-container.view-list .vf-project-year { display: none; }
+@media (max-width: 640px) {
+  .view-toggle-container { display: none; }
+  #projects-container.view-grid { grid-template-columns: 1fr; }
+  #projects-container.view-list .vf-project-row { flex-direction: column; }
+  #projects-container.view-list .vf-project-row-cover, #projects-container.view-list .vf-project-row-cover-placeholder { width: 100%; height: 180px; }
 }
 ${CALLOUT_CSS}
 `.trim();
@@ -676,6 +750,25 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 <\/script>`;
 }
+function resolveCoverFilename(cover) {
+  var _a, _b;
+  if (typeof cover !== "string" || !cover.trim())
+    return null;
+  const raw = cover.trim();
+  const wikiMatch = raw.match(/^!\[\[([^\]|]+)/);
+  const name = wikiMatch ? (_a = wikiMatch[1].trim().split("/").pop()) != null ? _a : null : (_b = raw.split("/").pop()) != null ? _b : null;
+  return name != null ? name : null;
+}
+function stripMarkdown(text) {
+  return text.replace(/!\[\[[^\]]*\]\]/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/^>\s*\[!\w+\][^\n]*/gm, "").replace(/^>\s*/gm, "").replace(/\*+([^*]+)\*+/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/^#{1,6}\s+/gm, "").replace(/^[-*+]\s+/gm, "").replace(/^\d+\.\s+/gm, "").replace(/\s+/g, " ").trim();
+}
+function getCardDescription(note) {
+  const fm = note.frontmatter.description;
+  if (typeof fm === "string" && fm.trim())
+    return fm.trim();
+  const stripped = stripMarkdown(note.body);
+  return stripped.length > 150 ? stripped.slice(0, 147).trimEnd() + "\u2026" : stripped;
+}
 function buildSite(notes, settings) {
   var _a;
   const siteTitle = settings.siteName;
@@ -699,17 +792,219 @@ function buildSite(notes, settings) {
   }
   return { files: [index, ...pages], pageCount: pages.length, imageMap: /* @__PURE__ */ new Map() };
 }
+var VT_GRID_ICON = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="8" height="8" rx="1"/><rect x="10" y="0" width="8" height="8" rx="1"/><rect x="0" y="10" width="8" height="8" rx="1"/><rect x="10" y="10" width="8" height="8" rx="1"/></svg>`;
+var VT_LIST_ICON = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="18" height="3" rx="1"/><rect x="0" y="7" width="18" height="3" rx="1"/><rect x="0" y="14" width="18" height="3" rx="1"/></svg>`;
+function renderViewToggle() {
+  return `<div class="view-toggle-container">
+  <button id="btn-grid" class="view-toggle-btn active" data-view="grid" title="Grid view" aria-label="Grid view">${VT_GRID_ICON}</button>
+  <button id="btn-list" class="view-toggle-btn" data-view="list" title="List view" aria-label="List view">${VT_LIST_ICON}</button>
+</div>`;
+}
+function renderViewToggleScript() {
+  return `<script>
+(function(){
+  var KEY='vaultfolio-view-preference';
+  var c=document.getElementById('projects-container');
+  var bg=document.getElementById('btn-grid');
+  var bl=document.getElementById('btn-list');
+  if(!c||!bg||!bl)return;
+  function apply(v){
+    if(v==='list'){c.classList.remove('view-grid');c.classList.add('view-list');bg.classList.remove('active');bl.classList.add('active');}
+    else{c.classList.remove('view-list');c.classList.add('view-grid');bg.classList.add('active');bl.classList.remove('active');}
+  }
+  apply(localStorage.getItem(KEY)==='list'?'list':'grid');
+  bg.addEventListener('click',function(){apply('grid');localStorage.setItem(KEY,'grid');});
+  bl.addEventListener('click',function(){apply('list');localStorage.setItem(KEY,'list');});
+})();
+<\/script>`;
+}
+function extractGalleryImages(md) {
+  var _a, _b;
+  const images = [];
+  const seen = /* @__PURE__ */ new Set();
+  const wikiRe = /!\[\[([^\]]+)\]\]/g;
+  let m;
+  while ((m = wikiRe.exec(md)) !== null) {
+    const ref = m[1].split("|")[0].trim();
+    const filename = (_a = ref.split("/").pop()) != null ? _a : ref;
+    if (!seen.has(filename)) {
+      seen.add(filename);
+      images.push({ src: `../images/${encodeURIComponent(filename)}`, alt: filename, caption: filename.replace(/\.[^.]+$/, "") });
+    }
+  }
+  const mdRe = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  while ((m = mdRe.exec(md)) !== null) {
+    const rawPath = m[2].trim().replace(/\s+["'][^"']*["']\s*$/, "");
+    if (/^https?:\/\//.test(rawPath))
+      continue;
+    const filename = (_b = rawPath.split("/").pop()) != null ? _b : rawPath;
+    if (!seen.has(filename)) {
+      seen.add(filename);
+      images.push({ src: `../images/${encodeURIComponent(filename)}`, alt: m[1] || filename, caption: filename.replace(/\.[^.]+$/, "") });
+    }
+  }
+  return images;
+}
+function stripImages(md) {
+  return md.replace(/!\[\[[^\]]*\]\]/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+}
+function splitContentAroundImages(md) {
+  const allRe = /!\[\[[^\]]*\]\]|!\[[^\]]*\]\([^)]*\)/g;
+  let firstIdx = -1, lastEnd = -1;
+  let m;
+  while ((m = allRe.exec(md)) !== null) {
+    if (firstIdx === -1)
+      firstIdx = m.index;
+    lastEnd = m.index + m[0].length;
+  }
+  if (firstIdx === -1)
+    return { before: md, after: "" };
+  return {
+    before: stripImages(md.slice(0, firstIdx)).trim(),
+    after: stripImages(md.slice(lastEnd)).trim()
+  };
+}
+function renderGallerySection(images) {
+  const items = images.map(
+    (img) => `    <div class="vf-gallery-item">
+      <img src="${img.src}" alt="${escapeHtml(img.alt)}" loading="lazy"/>
+      <span class="vf-img-caption">${escapeHtml(img.caption)}</span>
+    </div>`
+  ).join("\n");
+  return `<section class="vf-gallery-section">
+  <div class="vf-gallery-header">
+    <div class="vf-gallery-toggle">
+      <button id="vf-btn-grid" data-view="grid" class="vf-view-btn active" title="Grid view" aria-label="Grid view">${VT_GRID_ICON}</button>
+      <button id="vf-btn-list" data-view="list" class="vf-view-btn" title="List view" aria-label="List view">${VT_LIST_ICON}</button>
+    </div>
+  </div>
+  <div id="vf-gallery-container" class="vf-gallery-grid">
+${items}
+  </div>
+</section>`;
+}
+function renderLightboxHtml() {
+  return `<div id="vf-lightbox" class="vf-lightbox hidden">
+  <button class="vf-lb-close" aria-label="Close">&#x2715;</button>
+  <button class="vf-lb-prev" aria-label="Previous">&#x2039;</button>
+  <button class="vf-lb-next" aria-label="Next">&#x203A;</button>
+  <div class="vf-lb-counter"></div>
+  <img id="vf-lb-img" src="" alt=""/>
+</div>`;
+}
+function renderGalleryScript() {
+  return `<script>
+(function(){
+  var GKEY='vaultfolio-gallery-view';
+  var gc=document.getElementById('vf-gallery-container');
+  var gbtn=document.getElementById('vf-btn-grid');
+  var lbtn=document.getElementById('vf-btn-list');
+  if(!gc)return;
+  function setView(v){
+    if(v==='list'){gc.className='vf-gallery-list';if(gbtn)gbtn.classList.remove('active');if(lbtn)lbtn.classList.add('active');}
+    else{gc.className='vf-gallery-grid';if(gbtn)gbtn.classList.add('active');if(lbtn)lbtn.classList.remove('active');}
+    localStorage.setItem(GKEY,v);
+  }
+  setView(localStorage.getItem(GKEY)==='list'?'list':'grid');
+  if(gbtn)gbtn.addEventListener('click',function(){setView('grid');});
+  if(lbtn)lbtn.addEventListener('click',function(){setView('list');});
+  var lb=document.getElementById('vf-lightbox');
+  var lbImg=document.getElementById('vf-lb-img');
+  var lbCtr=document.querySelector('.vf-lb-counter');
+  var imgs=Array.from(document.querySelectorAll('#vf-gallery-container img'));
+  var cur=0;
+  function openLb(i){cur=i;if(lbImg)lbImg.src=imgs[i].src;if(lbCtr)lbCtr.textContent=(i+1)+' / '+imgs.length;if(lb)lb.classList.remove('hidden');document.body.style.overflow='hidden';}
+  function closeLb(){if(lb)lb.classList.add('hidden');document.body.style.overflow='';}
+  function prev(){cur=(cur-1+imgs.length)%imgs.length;if(lbImg)lbImg.src=imgs[cur].src;if(lbCtr)lbCtr.textContent=(cur+1)+' / '+imgs.length;}
+  function next(){cur=(cur+1)%imgs.length;if(lbImg)lbImg.src=imgs[cur].src;if(lbCtr)lbCtr.textContent=(cur+1)+' / '+imgs.length;}
+  imgs.forEach(function(img,i){img.style.cursor='zoom-in';img.addEventListener('click',function(){openLb(i);});});
+  var closeBtn=document.querySelector('.vf-lb-close');
+  var prevBtn=document.querySelector('.vf-lb-prev');
+  var nextBtn=document.querySelector('.vf-lb-next');
+  if(closeBtn)closeBtn.addEventListener('click',closeLb);
+  if(prevBtn)prevBtn.addEventListener('click',prev);
+  if(nextBtn)nextBtn.addEventListener('click',next);
+  if(lb)lb.addEventListener('click',function(e){if(e.target===lb)closeLb();});
+  document.addEventListener('keydown',function(e){if(!lb||lb.classList.contains('hidden'))return;if(e.key==='Escape')closeLb();if(e.key==='ArrowLeft')prev();if(e.key==='ArrowRight')next();});
+})();
+<\/script>`;
+}
+function renderGalleryCSS(theme) {
+  var _a;
+  const cfgMap = {
+    default: { lc: "rgba(255,255,255,0.4)", bc: "rgba(255,255,255,0.08)", bg: "#111111", ac: "#FF4D00", ic: "rgba(255,255,255,0.3)", ib: "rgba(255,255,255,0.2)" },
+    editorial: { lc: "#555", bc: "#D0D0D0", bg: "#F8F8F8", ac: "#0A0A0A", ic: "#999", ib: "#ccc" },
+    apple: { lc: "#6E6E73", bc: "#D2D2D7", bg: "#F5F5F7", ac: "#7C3AED", ic: "#6E6E73", ib: "#D2D2D7" },
+    swiss: { lc: "#999", bc: "#E0E0E0", bg: "#F5F5F5", ac: "#0A0A0A", ic: "#999", ib: "#ddd" },
+    simple: { lc: "#999", bc: "#eee", bg: "#f9f9f9", ac: "#0A0A0A", ic: "#999", ib: "#ddd" }
+  };
+  const c = (_a = cfgMap[theme]) != null ? _a : cfgMap.simple;
+  return `
+/* \u2500\u2500 Project Gallery \u2500\u2500 */
+.vf-gallery-section{margin:2.5rem 0;}
+.vf-gallery-header{display:flex;justify-content:flex-end;align-items:center;margin-bottom:16px;}
+.vf-gallery-label{font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${c.lc};}
+.vf-gallery-toggle{display:flex;gap:6px;align-items:center;}
+.vf-view-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;background:transparent;border:1px solid ${c.ib};transition:all 0.15s ease;}
+.vf-view-btn svg{fill:${c.ic};display:block;}
+.vf-view-btn.active{background:${c.ac};border-color:${c.ac};}
+.vf-view-btn.active svg{fill:#fff;}
+.vf-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;}
+.vf-gallery-grid .vf-gallery-item{border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:${c.bg};}
+.vf-gallery-grid .vf-gallery-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;}
+.vf-gallery-grid .vf-gallery-item:hover img{transform:scale(1.03);}
+.vf-gallery-grid .vf-img-caption{display:none;}
+.vf-gallery-list{display:flex;flex-direction:column;gap:16px;}
+.vf-gallery-list .vf-gallery-item{display:flex;flex-direction:column;gap:8px;padding-bottom:16px;border-bottom:1px solid ${c.bc};aspect-ratio:unset;border-radius:0;overflow:visible;}
+.vf-gallery-list .vf-gallery-item img{width:100%;max-height:500px;object-fit:contain;border-radius:8px;background:${c.bg};}
+.vf-gallery-list .vf-img-caption{font-size:12px;color:${c.lc};text-align:center;font-style:italic;display:block;}
+.vf-lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out;}
+.vf-lightbox.hidden{display:none;}
+#vf-lb-img{max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px;cursor:default;}
+.vf-lb-close{position:absolute;top:20px;right:24px;background:transparent;border:none;color:white;font-size:28px;cursor:pointer;opacity:0.7;transition:opacity 0.15s;}
+.vf-lb-close:hover{opacity:1;}
+.vf-lb-prev,.vf-lb-next{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;font-size:32px;width:48px;height:48px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;}
+.vf-lb-prev:hover,.vf-lb-next:hover{background:rgba(255,255,255,0.2);}
+.vf-lb-prev{left:20px;}
+.vf-lb-next{right:20px;}
+.vf-lb-counter{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.6);font-size:13px;pointer-events:none;}
+@media(max-width:640px){
+  .vf-gallery-toggle{display:none;}
+  .vf-gallery-grid{grid-template-columns:1fr;}
+  .vf-gallery-list .vf-gallery-item img{max-height:300px;}
+  .vf-lb-prev{width:36px;height:36px;font-size:24px;left:10px;}
+  .vf-lb-next{width:36px;height:36px;font-size:24px;right:10px;}
+}`;
+}
+function buildProseWithGallery(note, proseClass) {
+  const galleryFm = note.frontmatter.gallery;
+  const images = extractGalleryImages(note.body);
+  const useGallery = galleryFm === false ? false : galleryFm === true ? images.length >= 1 : images.length >= 2;
+  if (!useGallery || images.length === 0) {
+    return `<div class="${proseClass}">${markdownToHtml(note.body)}</div>`;
+  }
+  const { before, after } = splitContentAroundImages(note.body);
+  const parts = [];
+  if (before)
+    parts.push(`<div class="${proseClass}">${markdownToHtml(before)}</div>`);
+  parts.push(renderGallerySection(images));
+  if (after)
+    parts.push(`<div class="${proseClass}">${markdownToHtml(after)}</div>`);
+  return parts.join("\n");
+}
 function buildIndex(notes, settings) {
   const siteTitle = settings.siteName;
   const rows = notes.map((n, i) => {
-    var _a;
     const num = String(i + 1).padStart(2, "0");
-    const title = (_a = n.frontmatter.title) != null ? _a : n.slug;
-    const tags = Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [];
+    const title = n.displayTitle;
+    const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
     const year = extractYear(n.frontmatter.date);
     const tagPills = tags.slice(0, 3).map((t) => `<span class="vf-project-tag-pill">${escapeHtml(t)}</span>`).join("");
+    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
+    const coverHtml = coverFilename ? `<img class="vf-project-row-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-project-row-cover-placeholder"></div>`;
     return `<a href="pages/${n.slug}.html" class="vf-project-row vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
   <span class="vf-project-num">${num}</span>
+  ${coverHtml}
   <span class="vf-project-name">${escapeHtml(title)}</span>
   <div class="vf-project-meta-right">
     ${year ? `<span class="vf-project-year">${escapeHtml(year)}</span>` : ""}
@@ -755,9 +1050,14 @@ ${renderNav(siteTitle, "", settings.navLinks)}
 <!-- Projects -->
 <section id="work">
   <div class="vf-projects-section">
-    <span class="vf-section-label">Selected Work</span>
+    <div class="vf-section-header">
+      <span class="vf-section-label">Selected Work</span>
+      ${renderViewToggle()}
+    </div>
     ${filterHtml}
-    ${notes.length > 0 ? rows : `<p class="vf-no-projects">No published projects yet.</p>`}
+    <div id="projects-container" class="projects-grid view-grid">
+      ${notes.length > 0 ? rows : `<p class="vf-no-projects">No published projects yet.</p>`}
+    </div>
   </div>
 </section>
 
@@ -789,16 +1089,17 @@ ${renderNav(siteTitle, "", settings.navLinks)}
 
 ${renderFooter(siteTitle)}
 
+${renderViewToggleScript()}
 </body>
 </html>`;
   return { path: "index.html", content: html };
 }
 function buildPage(note, siteTitle) {
-  var _a, _b;
-  const title = (_a = note.frontmatter.title) != null ? _a : note.slug;
-  const description = (_b = note.frontmatter.description) != null ? _b : "";
+  var _a;
+  const title = note.displayTitle;
+  const description = (_a = note.frontmatter.description) != null ? _a : "";
   const date = note.frontmatter.date;
-  const tags = Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : [];
+  const tags = (Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : []).map((t) => String(t).toLowerCase());
   const idx = Math.abs(hashString(note.slug)) % CARD_COLORS.length;
   const heroBg = CARD_COLORS[idx];
   const tagChips = tags.map((t) => `<span class="vf-project-page-tag">${escapeHtml(String(t))}</span>`).join("");
@@ -807,6 +1108,7 @@ function buildPage(note, siteTitle) {
 <head>
 ${htmlHead(`${escapeHtml(title)} \u2014 ${escapeHtml(siteTitle)}`)}
   <meta name="description" content="${escapeHtml(description)}" />
+  <style>${renderGalleryCSS("default")}</style>
 </head>
 <body class="vf-project-page">
 
@@ -824,19 +1126,20 @@ ${renderNav(siteTitle, "../")}
   <h2 class="vf-project-content-title">${escapeHtml(title)}</h2>
   ${date ? `<p class="vf-project-date-line">${escapeHtml(String(date))}</p>` : ""}
   ${tags.length > 0 ? `<div class="vf-project-tags-line">${tagChips}</div>` : ""}
-  <div class="vf-prose">
-    ${markdownToHtml(note.body)}
-  </div>
+  ${buildProseWithGallery(note, "vf-prose")}
 </div>
 
 ${renderFooter(siteTitle)}
 
+${renderLightboxHtml()}
+${renderGalleryScript()}
 </body>
 </html>`;
   return { path: `pages/${note.slug}.html`, content: html };
 }
 function markdownToHtml(md) {
-  let html = parseCallouts(md).replace(/^#{6}\s+(.+)$/gm, "<h6>$1</h6>").replace(/^#{5}\s+(.+)$/gm, "<h5>$1</h5>").replace(/^#{4}\s+(.+)$/gm, "<h4>$1</h4>").replace(/^#{3}\s+(.+)$/gm, "<h3>$1</h3>").replace(/^#{2}\s+(.+)$/gm, "<h2>$1</h2>").replace(/^#{1}\s+(.+)$/gm, "<h1>$1</h1>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/!\[\[([^\]]+)\]\]/g, (_, ref) => {
+  const body = md.replace(/^﻿/, "").replace(/^---[\s\S]*?---\r?\n?/, "").replace(/^(title|published|tags|cover|date):[ \t].*$/gm, "").trim();
+  let html = parseCallouts(body).replace(/^#{6}\s+(.+)$/gm, "<h6>$1</h6>").replace(/^#{5}\s+(.+)$/gm, "<h5>$1</h5>").replace(/^#{4}\s+(.+)$/gm, "<h4>$1</h4>").replace(/^#{3}\s+(.+)$/gm, "<h3>$1</h3>").replace(/^#{2}\s+(.+)$/gm, "<h2>$1</h2>").replace(/^#{1}\s+(.+)$/gm, "<h1>$1</h1>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/!\[\[([^\]]+)\]\]/g, (_, ref) => {
     var _a;
     const name = (_a = ref.split("|")[0].trim().split("/").pop()) != null ? _a : ref;
     return `<img src="../images/${encodeURIComponent(name)}" alt="${escapeHtml(name)}" />`;
@@ -872,9 +1175,9 @@ function collectTags(notes) {
   for (const n of notes) {
     const t = n.frontmatter.tags;
     if (Array.isArray(t))
-      t.forEach((tag) => seen.add(String(tag)));
+      t.forEach((tag) => seen.add(String(tag).toLowerCase()));
   }
-  return [...seen];
+  return [...seen].sort();
 }
 function extractYear(date) {
   if (!date)
@@ -1049,6 +1352,7 @@ body.vf-editorial {
   font-family: 'DM Sans', sans-serif;
   font-size: 14px;
   margin-bottom: 24px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .vf-card-ed-tags {
   text-transform: uppercase;
@@ -1062,6 +1366,17 @@ body.vf-editorial {
   font-size: 14px;
   padding-bottom: 2px;
   align-self: flex-start;
+}
+
+/* \u2500\u2500 Card cover \u2500\u2500 */
+.vf-card-ed-cover {
+  width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+  border-bottom: 1px solid #0A0A0A;
+}
+.vf-card-ed-cover-placeholder {
+  width: 100%; height: 200px;
+  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
+  border-bottom: 1px solid #0A0A0A;
 }
 
 /* Quote */
@@ -1149,24 +1464,56 @@ body.vf-editorial {
   .vf-page-ed-title { font-size: 48px; }
   .vf-nav-ed-left, .vf-nav-ed-right { display: none; }
 }
+
+/* \u2500\u2500 View toggle (editorial) \u2500\u2500 */
+.vf-section-header-ed { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.view-toggle-container { display: flex; gap: 6px; align-items: center; }
+.view-toggle-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; background: transparent; border: 1px solid #ccc; transition: all 0.15s ease; }
+.view-toggle-btn svg { fill: #999; display: block; }
+.view-toggle-btn.active { background: #0A0A0A; border-color: #0A0A0A; }
+.view-toggle-btn.active svg { fill: #fff; }
+.projects-grid { transition: all 0.2s ease; }
+/* Grid view */
+#projects-container.view-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #0A0A0A; border: 1px solid #0A0A0A; }
+#projects-container.view-grid .vf-card-ed.full { grid-column: 1 / -1; }
+/* List view */
+#projects-container.view-list { display: flex; flex-direction: column; gap: 0; background: transparent; border: none; }
+#projects-container.view-list .vf-card-ed { flex-direction: row; align-items: center; border-bottom: 1px solid #0A0A0A; transition: background 0.15s ease, padding-left 0.2s ease; }
+#projects-container.view-list .vf-card-ed:hover { background: #f5f5f5; padding-left: 8px; }
+#projects-container.view-list .vf-card-ed.full { grid-column: unset; }
+#projects-container.view-list .vf-card-ed-cover { width: 140px; height: 90px; flex-shrink: 0; aspect-ratio: unset; border-bottom: none; border-right: 1px solid #0A0A0A; object-fit: cover; }
+#projects-container.view-list .vf-card-ed-cover-placeholder { width: 140px; height: 90px; flex-shrink: 0; border-bottom: none; border-right: 1px solid #0A0A0A; }
+#projects-container.view-list .vf-card-ed-header { min-height: unset; padding: 16px 20px; flex: 1; justify-content: center; gap: 6px; }
+#projects-container.view-list .vf-card-ed-num { margin-bottom: 0; }
+#projects-container.view-list .vf-card-ed-title { font-size: 18px; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#projects-container.view-list .vf-card-ed-desc { font-size: 13px; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#projects-container.view-list .vf-card-ed-link { display: none; }
+@media (max-width: 640px) {
+  .view-toggle-container { display: none; }
+  #projects-container.view-grid { grid-template-columns: 1fr; }
+  #projects-container.view-list .vf-card-ed { flex-direction: column; }
+  #projects-container.view-list .vf-card-ed-cover, #projects-container.view-list .vf-card-ed-cover-placeholder { width: 100%; height: 180px; border-right: none; border-bottom: 1px solid #0A0A0A; }
+}
 ${CALLOUT_CSS}
 `;
 var ED_COLORS = ["#F5F4EF", "#E8E4DC", "#1A1A1A", "#F0EBE0"];
 function buildEditorialIndex(notes, settings) {
   const siteTitle = settings.siteName;
   const rows = notes.map((n, i) => {
-    var _a, _b;
     const num = String(i + 1).padStart(2, "0");
-    const title = (_a = n.frontmatter.title) != null ? _a : n.slug;
-    const desc = (_b = n.frontmatter.description) != null ? _b : "";
-    const tags = Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [];
+    const title = n.displayTitle;
+    const desc = getCardDescription(n);
+    const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
     const isFull = i % 3 === 0;
     const fullClass = isFull ? " full" : "";
     const bgColor = ED_COLORS[i % ED_COLORS.length];
     const textColor = bgColor === "#1A1A1A" ? "#FFFFFF" : "#0A0A0A";
     const tagsStr = tags.slice(0, 3).join(" \u2022 ");
+    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
+    const coverHtml = coverFilename ? `<img class="vf-card-ed-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-card-ed-cover-placeholder"></div>`;
     return `
 <a href="pages/${n.slug}.html" class="vf-card-ed${fullClass} vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
+  ${coverHtml}
   <div class="vf-card-ed-header" style="background: ${bgColor}; color: ${textColor};">
     <div class="vf-card-ed-num">NO. ${num}</div>
     <div class="vf-card-ed-title">${escapeHtml(title)}</div>
@@ -1176,7 +1523,7 @@ function buildEditorialIndex(notes, settings) {
   </div>
 </a>`;
   }).join("n");
-  const allTags = Array.from(new Set(notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []))).sort();
+  const allTags = Array.from(new Set(notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags.map((t) => String(t).toLowerCase()) : []))).sort();
   const filterHtml = allTags.length > 0 ? `
     <div class="vf-filter-bar">
       <button class="vf-filter-btn active" data-filter="all">All</button>
@@ -1218,8 +1565,11 @@ function buildEditorialIndex(notes, settings) {
 </section>
 
 <section class="vf-projects-ed">
-  ${filterHtml}
-  <div class="vf-projects-ed-grid">
+  <div class="vf-section-header-ed">
+    ${filterHtml}
+    ${renderViewToggle()}
+  </div>
+  <div id="projects-container" class="projects-grid view-grid">
     ${rows}
   </div>
 </section>
@@ -1238,23 +1588,23 @@ function buildEditorialIndex(notes, settings) {
 </footer>
 
 ${allTags.length > 0 ? renderTagFilterScript() : ""}
+${renderViewToggleScript()}
 </body>
 </html>`;
   return { path: "index.html", content: html };
 }
 function buildEditorialPage(note, siteTitle) {
-  var _a;
-  const title = (_a = note.frontmatter.title) != null ? _a : note.slug;
+  const title = note.displayTitle;
   const date = note.frontmatter.date;
-  const tags = Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : [];
-  const tagHtml = tags.map((t) => `<span class="vf-page-ed-tag">${escapeHtml(String(t))}</span>`).join("");
+  const tags = (Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : []).map((t) => String(t).toLowerCase());
+  const tagHtml = tags.map((t) => `<span class="vf-page-ed-tag">${escapeHtml(t)}</span>`).join("");
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)} \u2014 ${escapeHtml(siteTitle)}</title>
-  <style>${EDITORIAL_CSS}</style>
+  <style>${EDITORIAL_CSS}${renderGalleryCSS("editorial")}</style>
 </head>
 <body class="vf-editorial">
 
@@ -1267,12 +1617,12 @@ function buildEditorialPage(note, siteTitle) {
 </header>
 
 <main class="vf-page-ed-content">
-  <div class="vf-prose-ed">
-    ${markdownToHtml(note.body)}
-  </div>
+  ${buildProseWithGallery(note, "vf-prose-ed")}
   ${tagHtml ? `<div class="vf-page-ed-tags">${tagHtml}</div>` : ""}
 </main>
 
+${renderLightboxHtml()}
+${renderGalleryScript()}
 </body>
 </html>`;
   return { path: `pages/${note.slug}.html`, content: html };
@@ -1327,18 +1677,30 @@ body.vf-apple {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;
 }
 .vf-card-ap {
-  background: #ffffff; border-radius: 18px; padding: 40px; display: flex; flex-direction: column;
+  background: #ffffff; border-radius: 18px; padding: 0; display: flex; flex-direction: column;
   transition: transform 0.2s cubic-bezier(0,0,0.5,1), box-shadow 0.2s cubic-bezier(0,0,0.5,1);
   box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+  overflow: hidden;
 }
 .vf-card-ap:hover {
   transform: scale(1.02); box-shadow: 0 12px 48px rgba(0,0,0,0.08);
+}
+.vf-card-ap-cover {
+  width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+}
+.vf-card-ap-cover-placeholder {
+  width: 100%; height: 200px;
+  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
+}
+.vf-card-ap-body {
+  padding: 32px; flex: 1; display: flex; flex-direction: column; min-height: 160px;
 }
 .vf-card-ap-title {
   font-size: 28px; font-weight: 600; letter-spacing: .004em; color: #1d1d1f; margin-bottom: 12px;
 }
 .vf-card-ap-desc {
   font-size: 17px; font-weight: 400; color: #86868b; margin-bottom: 24px; line-height: 1.47;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .vf-card-ap-tags {
   display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;
@@ -1407,25 +1769,58 @@ body.vf-apple {
   position: absolute; top: 16px; left: 40px; color: #7C3AED; font-size: 14px; font-weight: 400; z-index: 200; display: flex; align-items: center;
 }
 .vf-back-ap:hover { text-decoration: underline; }
+
+/* \u2500\u2500 View toggle (apple) \u2500\u2500 */
+.vf-section-header-ap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.view-toggle-container { display: flex; gap: 6px; align-items: center; }
+.view-toggle-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: transparent; border: 1px solid #D2D2D7; transition: all 0.15s ease; }
+.view-toggle-btn svg { fill: #6E6E73; display: block; }
+.view-toggle-btn:hover:not(.active) { background: #f0f0f0; border-color: #adadad; }
+.view-toggle-btn.active { background: #1d1d1f; border-color: #1d1d1f; }
+.view-toggle-btn.active svg { fill: #ffffff; }
+.projects-grid { transition: all 0.2s ease; }
+/* Grid view */
+#projects-container.view-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+/* List view */
+#projects-container.view-list { display: flex; flex-direction: column; gap: 0; }
+#projects-container.view-list .vf-card-ap { flex-direction: row; border-radius: 12px; border-bottom: 1px solid #f0f0f0; padding: 16px 0; background: transparent; box-shadow: none; transition: background 0.15s ease, padding-left 0.2s ease; }
+#projects-container.view-list .vf-card-ap:hover { background: #f9f9fb; padding-left: 8px; transform: none; box-shadow: none; }
+#projects-container.view-list .vf-card-ap-cover { width: 140px; height: 90px; aspect-ratio: unset; flex-shrink: 0; object-fit: cover; border-radius: 8px; }
+#projects-container.view-list .vf-card-ap-cover-placeholder { width: 140px; height: 90px; flex-shrink: 0; border-radius: 8px; }
+#projects-container.view-list .vf-card-ap-body { padding: 0 0 0 20px; min-height: unset; }
+#projects-container.view-list .vf-card-ap-title { font-size: 18px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#projects-container.view-list .vf-card-ap-desc { font-size: 13px; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 600px; }
+#projects-container.view-list .vf-card-ap-link { display: none; }
+@media (max-width: 640px) {
+  .view-toggle-container { display: none; }
+  #projects-container.view-grid { grid-template-columns: 1fr; }
+  #projects-container.view-list .vf-card-ap { flex-direction: column; }
+  #projects-container.view-list .vf-card-ap-cover, #projects-container.view-list .vf-card-ap-cover-placeholder { width: 100%; height: 180px; }
+  #projects-container.view-list .vf-card-ap-body { padding: 12px 0 0; }
+}
 ${CALLOUT_CSS}
 `;
 function buildAppleIndex(notes, settings) {
   const siteTitle = settings.siteName;
-  const rows = notes.map((n) => {
-    var _a, _b;
-    const title = (_a = n.frontmatter.title) != null ? _a : n.slug;
-    const desc = (_b = n.frontmatter.description) != null ? _b : "";
-    const tags = Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [];
-    const tagHtml = tags.slice(0, 3).map((t) => `<span class="vf-tag-ap">${escapeHtml(String(t))}</span>`).join("");
+  const rows = notes.map((n, i) => {
+    const title = n.displayTitle;
+    const desc = getCardDescription(n);
+    const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
+    const tagHtml = tags.slice(0, 3).map((t) => `<span class="vf-tag-ap">${escapeHtml(t)}</span>`).join("");
+    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
+    const coverHtml = coverFilename ? `<img class="vf-card-ap-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-card-ap-cover-placeholder"></div>`;
     return `
 <a href="pages/${n.slug}.html" class="vf-card-ap vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
-  <div class="vf-card-ap-title">${escapeHtml(title)}</div>
-  ${desc ? `<div class="vf-card-ap-desc">${escapeHtml(desc)}</div>` : ""}
-  ${tagHtml ? `<div class="vf-card-ap-tags">${tagHtml}</div>` : ""}
-  <div class="vf-card-ap-link">Learn more &gt;</div>
+  ${coverHtml}
+  <div class="vf-card-ap-body">
+    <div class="vf-card-ap-title">${escapeHtml(title)}</div>
+    ${desc ? `<div class="vf-card-ap-desc">${escapeHtml(desc)}</div>` : ""}
+    ${tagHtml ? `<div class="vf-card-ap-tags">${tagHtml}</div>` : ""}
+    <div class="vf-card-ap-link">Learn more &gt;</div>
+  </div>
 </a>`;
   }).join("\n");
-  const allTags = Array.from(new Set(notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []))).sort();
+  const allTags = Array.from(new Set(notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags.map((t) => String(t).toLowerCase()) : []))).sort();
   const filterHtml = allTags.length > 0 ? `
     <div class="vf-filter-bar">
       <button class="vf-filter-btn active" data-filter="all">All</button>
@@ -1465,8 +1860,11 @@ function buildAppleIndex(notes, settings) {
 </header>
 
 <section id="work" class="vf-projects-ap">
+  <div class="vf-section-header-ap">
+    ${renderViewToggle()}
+  </div>
   ${filterHtml}
-  <div class="vf-projects-ap-grid">
+  <div id="projects-container" class="projects-grid view-grid">
     ${rows}
   </div>
 </section>
@@ -1481,13 +1879,13 @@ function buildAppleIndex(notes, settings) {
 </footer>
 
 ${allTags.length > 0 ? renderTagFilterScript() : ""}
+${renderViewToggleScript()}
 </body>
 </html>`;
   return { path: "index.html", content: html };
 }
 function buildApplePage(note, siteTitle) {
-  var _a;
-  const title = (_a = note.frontmatter.title) != null ? _a : note.slug;
+  const title = note.displayTitle;
   const date = note.frontmatter.date;
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1495,7 +1893,7 @@ function buildApplePage(note, siteTitle) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)} - ${escapeHtml(siteTitle)}</title>
-  <style>${APPLE_CSS}</style>
+  <style>${APPLE_CSS}${renderGalleryCSS("apple")}</style>
 </head>
 <body class="vf-apple">
 
@@ -1510,15 +1908,15 @@ function buildApplePage(note, siteTitle) {
 </header>
 
 <main class="vf-page-ap-content">
-  <div class="vf-prose-ap">
-    ${markdownToHtml(note.body)}
-  </div>
+  ${buildProseWithGallery(note, "vf-prose-ap")}
 </main>
 
 <footer class="vf-footer-ap" style="border-top: none; padding-top: 80px;">
   Copyright &copy; 2026 ${escapeHtml(siteTitle)}. All rights reserved.
 </footer>
 
+${renderLightboxHtml()}
+${renderGalleryScript()}
 </body>
 </html>`;
   return { path: `pages/${note.slug}.html`, content: html };
@@ -1582,7 +1980,7 @@ body.vf-swiss {
 }
 .vf-card-sw {
   display: grid;
-  grid-template-columns: 80px 1fr 200px;
+  grid-template-columns: 80px 80px 1fr 200px;
   align-items: center;
   padding: 60px 40px;
   border-bottom: 1px solid #000;
@@ -1611,6 +2009,13 @@ body.vf-swiss {
 }
 .vf-card-sw-arrow {
   color: #ff0000; font-size: 24px; font-weight: 700; margin-top: 16px;
+}
+.vf-card-sw-cover {
+  width: 80px; height: 45px; object-fit: cover; display: block; align-self: center;
+}
+.vf-card-sw-cover-placeholder {
+  width: 80px; height: 45px; align-self: center;
+  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
 }
 
 /* Quote & Footer */
@@ -1678,25 +2083,50 @@ body.vf-swiss {
 }
 .vf-back-sw:hover { background: #ff0000; color: #fff; }
 
+/* \u2500\u2500 View toggle (swiss) \u2500\u2500 */
+.vf-section-header-sw { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px 16px; border-bottom: 1px solid #000; }
+.view-toggle-container { display: flex; gap: 6px; align-items: center; }
+.view-toggle-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 0; cursor: pointer; background: transparent; border: 1px solid #ddd; transition: all 0.15s ease; }
+.view-toggle-btn svg { fill: #999; display: block; }
+.view-toggle-btn.active { background: #0A0A0A; border-color: #0A0A0A; }
+.view-toggle-btn.active svg { fill: #fff; }
+.projects-grid { transition: all 0.2s ease; }
+/* List view: existing row layout */
+#projects-container.view-list { display: block; }
+/* Grid view: reflow rows as tiles */
+#projects-container.view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: #000; border-top: 1px solid #000; }
+#projects-container.view-grid .vf-card-sw { display: flex; flex-direction: column; background: #fff; border-bottom: none; padding: 24px; gap: 12px; }
+#projects-container.view-grid .vf-card-sw:hover { background: #f0f0f0; }
+#projects-container.view-grid .vf-card-sw-cover { width: 100%; height: 120px; }
+#projects-container.view-grid .vf-card-sw-cover-placeholder { width: 100%; height: 120px; }
+#projects-container.view-grid .vf-card-sw-num { font-size: 16px; }
+#projects-container.view-grid .vf-card-sw-title { font-size: clamp(24px, 3vw, 36px); }
+#projects-container.view-grid .vf-card-sw-right { flex-direction: row; align-items: center; justify-content: space-between; text-align: left; }
+#projects-container.view-grid .vf-card-sw-arrow { margin-top: 0; }
 @media (max-width: 768px) {
   .vf-card-sw { grid-template-columns: 1fr; gap: 16px; padding: 40px 24px; }
   .vf-card-sw-right { align-items: flex-start; text-align: left; }
+  .vf-card-sw-cover, .vf-card-sw-cover-placeholder { display: none; }
   .vf-nav-sw, .vf-footer-sw { padding: 24px; }
   .vf-hero-sw, .vf-quote-sw, .vf-page-sw-header { padding: 80px 24px; }
+  .view-toggle-container { display: none; }
+  #projects-container.view-grid { grid-template-columns: 1fr; }
 }
 ${CALLOUT_CSS}
 `;
 function buildSwissIndex(notes, settings) {
   const siteTitle = settings.siteName;
   const rows = notes.map((n, i) => {
-    var _a;
     const num = String(i + 1).padStart(2, "0");
-    const title = (_a = n.frontmatter.title) != null ? _a : n.slug;
-    const tags = Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [];
+    const title = n.displayTitle;
+    const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
     const tagsStr = tags.slice(0, 3).join(" / ");
+    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
+    const coverHtml = coverFilename ? `<img class="vf-card-sw-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-card-sw-cover-placeholder"></div>`;
     return `
 <a href="pages/${n.slug}.html" class="vf-card-sw vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
   <div class="vf-card-sw-num">${num}</div>
+  ${coverHtml}
   <div class="vf-card-sw-title">${escapeHtml(title)}</div>
   <div class="vf-card-sw-right">
     ${tagsStr ? `<div class="vf-card-sw-tags">${escapeHtml(tagsStr)}</div>` : ""}
@@ -1704,7 +2134,7 @@ function buildSwissIndex(notes, settings) {
   </div>
 </a>`;
   }).join("\n");
-  const allTags = Array.from(new Set(notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []))).sort();
+  const allTags = Array.from(new Set(notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags.map((t) => String(t).toLowerCase()) : []))).sort();
   const filterHtml = allTags.length > 0 ? `
     <div class="vf-filter-bar">
       <button class="vf-filter-btn active" data-filter="all" style="margin-right: 16px;">All</button>
@@ -1734,8 +2164,13 @@ function buildSwissIndex(notes, settings) {
 </header>
 
 <section class="vf-projects-sw">
+  <div class="vf-section-header-sw">
+    ${renderViewToggle()}
+  </div>
   ${filterHtml}
-  ${rows}
+  <div id="projects-container" class="projects-grid view-grid">
+    ${rows}
+  </div>
 </section>
 
 <section class="vf-quote-sw">
@@ -1748,13 +2183,13 @@ function buildSwissIndex(notes, settings) {
 </footer>
 
 ${allTags.length > 0 ? renderTagFilterScript() : ""}
+${renderViewToggleScript()}
 </body>
 </html>`;
   return { path: "index.html", content: html };
 }
 function buildSwissPage(note, siteTitle) {
-  var _a;
-  const title = (_a = note.frontmatter.title) != null ? _a : note.slug;
+  const title = note.displayTitle;
   const date = note.frontmatter.date;
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1762,7 +2197,7 @@ function buildSwissPage(note, siteTitle) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)} - ${escapeHtml(siteTitle)}</title>
-  <style>${SWISS_CSS}</style>
+  <style>${SWISS_CSS}${renderGalleryCSS("swiss")}</style>
 </head>
 <body class="vf-swiss">
 
@@ -1774,9 +2209,7 @@ function buildSwissPage(note, siteTitle) {
 </header>
 
 <main class="vf-page-sw-content">
-  <div class="vf-prose-sw">
-    ${markdownToHtml(note.body)}
-  </div>
+  ${buildProseWithGallery(note, "vf-prose-sw")}
 </main>
 
 <footer class="vf-footer-sw" style="border-top: 1px solid #000;">
@@ -1784,6 +2217,8 @@ function buildSwissPage(note, siteTitle) {
   <div class="vf-footer-sw-right">&copy; 2026</div>
 </footer>
 
+${renderLightboxHtml()}
+${renderGalleryScript()}
 </body>
 </html>`;
   return { path: `pages/${note.slug}.html`, content: html };
@@ -1826,11 +2261,22 @@ img { max-width: 100%; height: auto; display: block; }
 .sp-card {
   display: block;
   border: 1px solid #eee;
-  padding: 24px;
+  padding: 0;
   color: #1a1a1a;
+  overflow: hidden;
 }
+.sp-card-cover {
+  width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+  border-bottom: 1px solid #eee;
+}
+.sp-card-cover-placeholder {
+  width: 100%; height: 200px;
+  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
+  border-bottom: 1px solid #eee;
+}
+.sp-card-body { padding: 24px; min-height: 120px; }
 .sp-card-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
-.sp-card-desc { font-size: 14px; color: #555; margin-bottom: 12px; }
+.sp-card-desc { font-size: 14px; color: #555; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .sp-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .sp-tag {
   font-size: 12px; color: #777;
@@ -1885,6 +2331,30 @@ img { max-width: 100%; height: auto; display: block; }
 .sp-prose hr { border: none; border-top: 1px solid #eee; margin: 2rem 0; }
 .sp-prose img { width: 100%; margin: 1.5rem 0; }
 
+/* View toggle */
+.sp-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.sp-section-header .sp-section-heading { margin-bottom: 0; }
+.view-toggle-container { display: flex; gap: 6px; align-items: center; }
+.view-toggle-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: pointer; background: transparent; border: 1px solid #ddd; transition: all 0.15s ease; }
+.view-toggle-btn svg { fill: #aaa; display: block; }
+.view-toggle-btn.active { background: #1a1a1a; border-color: #1a1a1a; }
+.view-toggle-btn.active svg { fill: #fff; }
+
+/* Grid view */
+#projects-container.view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+#projects-container.view-grid .sp-card { display: flex; flex-direction: column; }
+#projects-container.view-grid .sp-card-cover { aspect-ratio: 16/9; width: 100%; }
+#projects-container.view-grid .sp-card-cover-placeholder { height: 160px; width: 100%; }
+
+/* List view */
+#projects-container.view-list { display: flex; flex-direction: column; gap: 0; }
+#projects-container.view-list .sp-card { display: flex; flex-direction: row; align-items: stretch; border-bottom: none; border-top: none; border-left: none; border-right: none; border-bottom: 1px solid #eee; padding: 0; }
+#projects-container.view-list .sp-card:first-child { border-top: 1px solid #eee; }
+#projects-container.view-list .sp-card-cover { width: 140px; min-width: 140px; height: 100px; aspect-ratio: unset; flex-shrink: 0; border-bottom: none; border-right: 1px solid #eee; }
+#projects-container.view-list .sp-card-cover-placeholder { width: 140px; min-width: 140px; height: 100px; flex-shrink: 0; border-bottom: none; border-right: 1px solid #eee; }
+#projects-container.view-list .sp-card-body { padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; }
+#projects-container.view-list .sp-card-desc { -webkit-line-clamp: 2; }
+
 @media (max-width: 640px) {
   .sp-nav { padding: 16px 20px; }
   .sp-hero { padding: 40px 20px 32px; }
@@ -1893,20 +2363,29 @@ img { max-width: 100%; height: auto; display: block; }
   .sp-back { padding: 16px 20px 0; }
   .sp-page-header { padding: 20px 20px 16px; }
   .sp-page-content { padding: 20px 20px 60px; }
+  .view-toggle-container { display: none; }
+  #projects-container.view-grid { grid-template-columns: 1fr; }
+  #projects-container.view-list .sp-card { flex-direction: column; }
+  #projects-container.view-list .sp-card-cover,
+  #projects-container.view-list .sp-card-cover-placeholder { width: 100%; min-width: unset; height: 160px; border-right: none; border-bottom: 1px solid #eee; }
 }
 ${CALLOUT_CSS}
 `.trim();
 function buildSimpleIndex(notes, siteTitle) {
-  const cards = notes.map((n) => {
-    var _a, _b;
-    const title = (_a = n.frontmatter.title) != null ? _a : n.slug;
-    const desc = (_b = n.frontmatter.description) != null ? _b : "";
-    const tags = Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [];
+  const cards = notes.map((n, i) => {
+    const title = n.displayTitle;
+    const desc = getCardDescription(n);
+    const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
     const tagHtml = tags.map((t) => `<span class="sp-tag">${escapeHtml(t)}</span>`).join("");
-    return `<a href="pages/${n.slug}.html" class="sp-card">
-  <div class="sp-card-title">${escapeHtml(title)}</div>
-  ${desc ? `<div class="sp-card-desc">${escapeHtml(desc)}</div>` : ""}
-  ${tags.length > 0 ? `<div class="sp-card-tags">${tagHtml}</div>` : ""}
+    const coverFilename = resolveCoverFilename(n.frontmatter.cover);
+    const coverHtml = coverFilename ? `<img class="sp-card-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="sp-card-cover-placeholder"></div>`;
+    return `<a href="pages/${n.slug}.html" class="sp-card" data-tags="${escapeHtml(tags.join(" "))}">
+  ${coverHtml}
+  <div class="sp-card-body">
+    <div class="sp-card-title">${escapeHtml(title)}</div>
+    ${desc ? `<div class="sp-card-desc">${escapeHtml(desc)}</div>` : ""}
+    ${tags.length > 0 ? `<div class="sp-card-tags">${tagHtml}</div>` : ""}
+  </div>
 </a>`;
   }).join("\n");
   const html = `<!DOCTYPE html>
@@ -1929,23 +2408,26 @@ function buildSimpleIndex(notes, siteTitle) {
 </section>
 
 <section class="sp-section">
-  <div class="sp-section-heading">Work</div>
-  ${notes.length > 0 ? `<div class="sp-cards">${cards}</div>` : `<p class="sp-empty">No published projects yet.</p>`}
+  <div class="sp-section-header">
+    <div class="sp-section-heading">Work</div>
+    ${renderViewToggle()}
+  </div>
+  ${notes.length > 0 ? `<div id="projects-container" class="sp-cards view-grid">${cards}</div>` : `<p class="sp-empty">No published projects yet.</p>`}
 </section>
 
 <footer class="sp-footer">
   ${escapeHtml(siteTitle)} &mdash; Built with VaultFolio
 </footer>
 
+${renderViewToggleScript()}
 </body>
 </html>`;
   return { path: "index.html", content: html };
 }
 function buildSimplePage(note, siteTitle) {
-  var _a;
-  const title = (_a = note.frontmatter.title) != null ? _a : note.slug;
+  const title = note.displayTitle;
   const date = note.frontmatter.date;
-  const tags = Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : [];
+  const tags = (Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : []).map((t) => String(t).toLowerCase());
   const tagHtml = tags.map((t) => `<span class="sp-page-tag">${escapeHtml(String(t))}</span>`).join("");
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1953,7 +2435,7 @@ function buildSimplePage(note, siteTitle) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)} \u2014 ${escapeHtml(siteTitle)}</title>
-  <style>${SIMPLE_CSS}</style>
+  <style>${SIMPLE_CSS}${renderGalleryCSS("simple")}</style>
 </head>
 <body>
 
@@ -1966,15 +2448,15 @@ function buildSimplePage(note, siteTitle) {
 </div>
 
 <div class="sp-page-content">
-  <div class="sp-prose">
-    ${markdownToHtml(note.body)}
-  </div>
+  ${buildProseWithGallery(note, "sp-prose")}
 </div>
 
 <footer class="sp-footer">
   ${escapeHtml(siteTitle)} &mdash; Built with VaultFolio
 </footer>
 
+${renderLightboxHtml()}
+${renderGalleryScript()}
 </body>
 </html>`;
   return { path: `pages/${note.slug}.html`, content: html };
@@ -2533,12 +3015,12 @@ var VaultFolioPlugin = class extends import_obsidian3.Plugin {
   }
   // ── Public methods used by UI ──────────────────────────────────────────────
   async buildSite() {
-    var _a;
+    var _a, _b;
     const publishedNotes = await getPublishedNotes(
       this.app,
       this.settings.portfolioFolder
     );
-    const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path));
+    const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path, n.frontmatter));
     const result = buildSite(siteNotes, this.settings);
     const outputBase = this.settings.outputFolder.replace(/\/+$/, "");
     const adapter = this.app.vault.adapter;
@@ -2564,6 +3046,25 @@ var VaultFolioPlugin = class extends import_obsidian3.Plugin {
           const binary = await adapter.readBinary(vaultPath);
           await adapter.writeBinary(`${outputBase}/${deployPath}`, binary);
         }
+      }
+    }
+    for (const note of publishedNotes) {
+      const coverRaw = note.frontmatter.cover;
+      if (!coverRaw)
+        continue;
+      const trimmed = coverRaw.trim();
+      const wikiMatch = trimmed.match(/^!\[\[([^\]|]+)/);
+      const coverRef = wikiMatch ? { type: "wikilink", path: wikiMatch[1].trim() } : { type: "markdown", path: trimmed };
+      const vaultPath = this.resolveImageRef(coverRef, note.path);
+      if (!vaultPath)
+        continue;
+      const deployPath = `images/${(_b = vaultPath.split("/").pop()) != null ? _b : vaultPath}`;
+      if (imageMap.has(deployPath))
+        continue;
+      imageMap.set(deployPath, vaultPath);
+      if (await adapter.exists(vaultPath)) {
+        const binary = await adapter.readBinary(vaultPath);
+        await adapter.writeBinary(`${outputBase}/${deployPath}`, binary);
       }
     }
     result.imageMap = imageMap;
