@@ -6,6 +6,7 @@ export interface NoteFrontmatter {
   tags?: string[];
   description?: string;
   slug?: string;
+  cover?: string;
   published?: boolean;
   [key: string]: unknown;
 }
@@ -14,6 +15,7 @@ export interface ParsedNote {
   frontmatter: NoteFrontmatter;
   body: string;
   slug: string;
+  displayTitle: string;
 }
 
 export interface ImageRef {
@@ -42,18 +44,59 @@ export class Parser {
     const published: PublishedNote[] = [];
 
     for (const file of markdownFiles) {
-      const cache = this.app.metadataCache.getFileCache(file);
-      const frontmatter = (cache?.frontmatter ?? {}) as NoteFrontmatter;
+      try {
+        // Read content first so we can fall back to our lenient parser when
+        // Obsidian's YAML engine fails (e.g. on unquoted ![[wikilink]] values,
+        // which are valid Obsidian syntax but invalid standard YAML).
+        const content = await this.app.vault.read(file);
 
-      if (frontmatter.published !== true) continue;
+        const cache = this.app.metadataCache.getFileCache(file);
+        const cachedFm = cache?.frontmatter;
 
-      const content = await this.app.vault.read(file);
-      const title =
-        typeof frontmatter.title === "string" && frontmatter.title.trim()
-          ? frontmatter.title.trim()
-          : file.basename;
+        // Spread into a plain mutable object so we can safely normalise fields
+        // without mutating Obsidian's internal cache object.
+        const frontmatter: NoteFrontmatter = {
+          ...(cachedFm != null
+            ? (cachedFm as NoteFrontmatter)
+            : extractFrontmatterFromContent(content)),
+        };
 
-      published.push({ path: file.path, title, frontmatter, content, imageRefs: extractImageRefs(content) });
+        // Normalise tags to lowercase so the entire pipeline is case-insensitive.
+        // extractFrontmatterFromContent() already does this, but the metadataCache
+        // path does not — apply it unconditionally so both paths are consistent.
+        if (Array.isArray(frontmatter.tags)) {
+          frontmatter.tags = frontmatter.tags.map((t) => String(t).toLowerCase());
+        }
+
+        // Normalise the cover field.  Obsidian 1.4+ stores wikilink embed values
+        // (![[image.png]]) as a FrontmatterLink object {path, displayText} rather
+        // than a plain string.  Convert any non-string cover to the filename string
+        // so downstream code can always treat cover as string | undefined.
+        const rawCover = (frontmatter as Record<string, unknown>).cover;
+        if (rawCover != null && typeof rawCover !== "string") {
+          const obj = rawCover as Record<string, unknown>;
+          frontmatter.cover = String(
+            obj.path ?? obj.link ?? obj.displayText ?? rawCover
+          );
+        }
+
+        if (frontmatter.published !== true) continue;
+
+        const title =
+          typeof frontmatter.title === "string" && frontmatter.title.trim()
+            ? frontmatter.title.trim()
+            : file.basename;
+
+        published.push({
+          path: file.path,
+          title,
+          frontmatter,
+          content,
+          imageRefs: extractImageRefs(content),
+        });
+      } catch (err) {
+        console.warn(`VaultFolio: skipping "${file.path}" — ${err}`);
+      }
     }
 
     return published;
@@ -72,17 +115,29 @@ export async function getPublishedNotes(
 
 /**
  * Splits raw markdown into frontmatter block and body.
- * Returns empty frontmatter if no YAML block is present.
+ * Pass `cachedFrontmatter` (from Obsidian's metadataCache) to skip re-parsing
+ * the YAML — this handles Obsidian-specific syntax that our parser may not
+ * support (e.g. wikilinks as values). Falls back to our lenient parser when
+ * no cached frontmatter is provided.
  */
-export function parseNote(rawContent: string, fallbackSlug: string): ParsedNote {
-  const frontmatter = extractFrontmatter(rawContent);
+export function parseNote(
+  rawContent: string,
+  fallbackSlug: string,
+  cachedFrontmatter?: NoteFrontmatter
+): ParsedNote {
+  const frontmatter = cachedFrontmatter ?? extractFrontmatterFromContent(rawContent);
   const body = stripFrontmatter(rawContent);
   const slug = frontmatter.slug ?? slugify(frontmatter.title ?? fallbackSlug);
-
-  return { frontmatter, body, slug };
+  const basename = fallbackSlug.split("/").pop()?.replace(/\.md$/i, "") ?? fallbackSlug;
+  const displayTitle =
+    typeof frontmatter.title === "string" && frontmatter.title.trim()
+      ? frontmatter.title.trim()
+      : basename;
+  return { frontmatter, body, slug, displayTitle };
 }
 
-function extractFrontmatter(content: string): NoteFrontmatter {
+/** Exposed so getPublishedNotes() can use it as a fallback. */
+function extractFrontmatterFromContent(content: string): NoteFrontmatter {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return {};
   const fm = parseYamlSimple(match[1]);
@@ -93,12 +148,17 @@ function extractFrontmatter(content: string): NoteFrontmatter {
 }
 
 function stripFrontmatter(content: string): string {
-  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
+  return content
+    .replace(/^﻿/, "")                              // strip UTF-8 BOM if present
+    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "")     // strip frontmatter block
+    .trim();
 }
 
 /**
- * Minimal YAML parser for flat key-value pairs and simple arrays.
- * Handles common frontmatter patterns without a full YAML lib.
+ * Lenient YAML parser for flat key-value pairs and simple arrays.
+ * Deliberately permissive so that Obsidian-specific syntax in frontmatter
+ * values (e.g. ![[wikilinks]], paths with spaces, special chars) never
+ * silently drops fields or corrupts subsequent lines.
  */
 function parseYamlSimple(yaml: string): NoteFrontmatter {
   const result: NoteFrontmatter = {};
@@ -120,15 +180,21 @@ function parseYamlSimple(yaml: string): NoteFrontmatter {
       const value = kvMatch[2].trim();
 
       if (value === "") {
+        // Start of a block-sequence list (next lines will be "  - item")
         result[currentKey] = [];
         inArray = true;
-      } else if (value.startsWith("[")) {
+      } else if (value.startsWith("[") && !value.startsWith("[[")) {
+        // Inline YAML array: [a, b, c]
+        // Explicitly exclude [[ to avoid treating [[wikilinks]] as arrays.
         result[currentKey] = value
           .replace(/^\[|\]$/g, "")
           .split(",")
           .map((s) => s.trim().replace(/^["']|["']$/g, ""));
         inArray = false;
       } else {
+        // Plain string — covers all other cases:
+        //   ![[wikilink syntax]]  paths with spaces  special chars ( ) [ ] !
+        // Strip surrounding quotes when present ("value" or 'value').
         result[currentKey] = value.replace(/^["']|["']$/g, "");
         inArray = false;
       }

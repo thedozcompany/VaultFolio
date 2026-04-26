@@ -105,7 +105,7 @@ export default class VaultFolioPlugin extends Plugin {
       this.app,
       this.settings.portfolioFolder
     );
-    const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path));
+    const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path, n.frontmatter));
     const result = buildSite(siteNotes, this.settings);
 
     const outputBase = this.settings.outputFolder.replace(/\/+$/, "");
@@ -134,6 +134,26 @@ export default class VaultFolioPlugin extends Plugin {
           const binary = await adapter.readBinary(vaultPath);
           await adapter.writeBinary(`${outputBase}/${deployPath}`, binary);
         }
+      }
+    }
+
+    // Resolve cover images declared in frontmatter (cover: path or cover: ![[image.png]])
+    for (const note of publishedNotes) {
+      const coverRaw = note.frontmatter.cover as string | undefined;
+      if (!coverRaw) continue;
+      const trimmed = coverRaw.trim();
+      const wikiMatch = trimmed.match(/^!\[\[([^\]|]+)/);
+      const coverRef: ImageRef = wikiMatch
+        ? { type: "wikilink", path: wikiMatch[1].trim() }
+        : { type: "markdown", path: trimmed };
+      const vaultPath = this.resolveImageRef(coverRef, note.path);
+      if (!vaultPath) continue;
+      const deployPath = `images/${vaultPath.split("/").pop() ?? vaultPath}`;
+      if (imageMap.has(deployPath)) continue;
+      imageMap.set(deployPath, vaultPath);
+      if (await adapter.exists(vaultPath)) {
+        const binary = await adapter.readBinary(vaultPath);
+        await adapter.writeBinary(`${outputBase}/${deployPath}`, binary);
       }
     }
 
