@@ -101,7 +101,7 @@ export class VaultFolioSettingsTab extends PluginSettingTab {
       "color: #7C3AED; font-size: 12px; cursor: pointer; display: inline-block; margin: -0.5rem 0 1rem 0; padding: 0 1rem; text-decoration: none;";
     previewLink.addEventListener("click", (e) => {
       e.preventDefault();
-      window.open("https://thedozcompany.github.io/vaultfolio-portfolio/theme-preview.html", "_blank");
+      window.open("https://thedozcompany.github.io/VaultFolio/theme-preview.html", "_blank");
     });
 
     // --- Site Content section ---
