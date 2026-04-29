@@ -8,6 +8,7 @@ export interface NoteFrontmatter {
   slug?: string;
   cover?: string;
   published?: boolean;
+  show_properties?: string[];
   [key: string]: unknown;
 }
 
@@ -16,6 +17,7 @@ export interface ParsedNote {
   body: string;
   slug: string;
   displayTitle: string;
+  publicProperties: Record<string, string | string[]>;
 }
 
 export interface ImageRef {
@@ -32,7 +34,7 @@ export interface PublishedNote {
 }
 
 export class Parser {
-  constructor(private app: App, private settings: { portfolioFolder: string }) {}
+  constructor(private app: App, private settings: { portfolioFolder: string; coverProperty: string }) {}
 
   async getPublishedNotes(): Promise<PublishedNote[]> {
     const folder = this.settings.portfolioFolder.replace(/\/+$/, "");
@@ -70,14 +72,18 @@ export class Parser {
 
         // Normalise the cover field.  Obsidian 1.4+ stores wikilink embed values
         // (![[image.png]]) as a FrontmatterLink object {path, displayText} rather
-        // than a plain string.  Convert any non-string cover to the filename string
-        // so downstream code can always treat cover as string | undefined.
-        const rawCover = (frontmatter as Record<string, unknown>).cover;
+        // than a plain string.  Read exclusively from the configured property name
+        // and always write the result (or undefined) to frontmatter.cover so the
+        // original spread value never leaks through when coverProp !== "cover".
+        const coverProp = this.settings.coverProperty || "cover";
+        const rawCover = (frontmatter as Record<string, unknown>)[coverProp];
         if (rawCover != null && typeof rawCover !== "string") {
           const obj = rawCover as Record<string, unknown>;
-          frontmatter.cover = String(
-            obj.path ?? obj.link ?? obj.displayText ?? rawCover
-          );
+          frontmatter.cover = String(obj.path ?? obj.link ?? obj.displayText ?? rawCover);
+        } else if (typeof rawCover === "string" && rawCover !== "") {
+          frontmatter.cover = rawCover;
+        } else {
+          frontmatter.cover = undefined;
         }
 
         if (frontmatter.published !== true) continue;
@@ -103,12 +109,34 @@ export class Parser {
   }
 }
 
+const RESERVED_PROPERTY_KEYS = new Set([
+  "title", "published", "tags", "cover", "date", "show_properties",
+]);
+
+function buildPublicProperties(fm: NoteFrontmatter): Record<string, string | string[]> {
+  const raw = fm.show_properties;
+  if (!Array.isArray(raw) || raw.length === 0) return {};
+  const result: Record<string, string | string[]> = {};
+  for (const key of raw) {
+    if (typeof key !== "string" || RESERVED_PROPERTY_KEYS.has(key)) continue;
+    const value = fm[key];
+    if (value === null || value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      result[key] = value.map((v) => String(v));
+    } else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      result[key] = String(value);
+    }
+  }
+  return result;
+}
+
 /** Standalone helper kept for backwards compatibility with builder pipeline. */
 export async function getPublishedNotes(
   app: App,
-  portfolioFolder: string
+  portfolioFolder: string,
+  coverProperty = "cover"
 ): Promise<PublishedNote[]> {
-  return new Parser(app, { portfolioFolder }).getPublishedNotes();
+  return new Parser(app, { portfolioFolder, coverProperty }).getPublishedNotes();
 }
 
 // ── Low-level parsing helpers (used by builder) ───────────────────────────────
@@ -133,7 +161,8 @@ export function parseNote(
     typeof frontmatter.title === "string" && frontmatter.title.trim()
       ? frontmatter.title.trim()
       : basename;
-  return { frontmatter, body, slug, displayTitle };
+  const publicProperties = buildPublicProperties(frontmatter);
+  return { frontmatter, body, slug, displayTitle, publicProperties };
 }
 
 /** Exposed so getPublishedNotes() can use it as a fallback. */
