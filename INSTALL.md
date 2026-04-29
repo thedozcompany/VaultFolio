@@ -16,6 +16,7 @@ official Obsidian store yet.
 5. Search "BRAT"
 6. Install it
 7. Enable it
+
 <img width="274" height="327" alt="image" src="https://github.com/user-attachments/assets/0753d4c2-dfa1-4322-b3b9-08d9d13197ee" />
 
 <img width="723" height="295" alt="image" src="https://github.com/user-attachments/assets/87e9584d-e0d8-47ce-a999-b6ac3281750c" />
@@ -31,6 +32,7 @@ official Obsidian store yet.
    https://github.com/thedozcompany/VaultFolio
 5. Click "Add Plugin"
 6. Go back to Community Plugins
+7. Enable VaultFolio
 
 <img width="1091" height="812" alt="image" src="https://github.com/user-attachments/assets/20b76826-9c5c-45f3-b3d5-b50bd6f4d112" />
 <img width="549" height="409" alt="image" src="https://github.com/user-attachments/assets/eb7976d7-0fa1-4e88-b0ae-9d184b476783" />
@@ -53,36 +55,29 @@ This is where your portfolio will live.
 
 1. Go to github.com
 2. Click the + icon → New repository
-3. Name it (for example): my-portfolio or anything you want to call your blog. Note that if you want to locate your blog in the  username.github.io, you can also name the repository directly as username.github.io. If you call it my-portfolio or something similar, it will be located in username.github.io/my-portfolio
-4. Set to Public (default option)
-5. Click Create repository
-6. Add a README file:
-   - Click "creating a new file"
-   - Name it README.md
-   - Type anything
-   - Click Commit changes
+3. Name it (e.g. `my-portfolio`)
+   - To host at `username.github.io`, name it `username.github.io`
+   - Any other name will host at `username.github.io/my-portfolio`
+4. Set to **Public**
+5. Check **Add a README file**
+6. Click Create repository
+
 <img width="589" height="213" alt="image" src="https://github.com/user-attachments/assets/924a943e-d8cd-4ae7-ac88-8dedfaa5266a" />
 <img width="838" height="937" alt="image" src="https://github.com/user-attachments/assets/367d9f7f-0637-4856-aaee-33c7f21fd1ad" />
 
 ---
 
-## Step 5: Create a GitHub Token
+## Step 5: Connect GitHub
 
-This lets VaultFolio publish to your GitHub.
+VaultFolio connects to GitHub securely using OAuth — no token or password needed.
 
-1. Go to github.com
-2. Click your profile photo → Settings
-3. Scroll down → Developer settings
-4. Personal access tokens → Tokens (classic)
-5. Generate new token (classic)
-6. Note: VaultFolio
-7. Expiration: No expiration
-8. Check the "repo" checkbox
-9. Click Generate token
-10. COPY THE TOKEN NOW
-    (GitHub only shows it once)
-
-<img width="1268" height="609" alt="image" src="https://github.com/user-attachments/assets/d26eb550-5fcd-4a61-a033-dcf1ee856d49" />
+1. Open Obsidian
+2. Settings → VaultFolio
+3. Click **Connect GitHub**
+4. A code like `XXXX-XXXX` will appear — copy it
+5. Visit [github.com/login/device](https://github.com/login/device) in your browser
+6. Enter the code → click **Authorize VaultFolio**
+7. Return to Obsidian — you'll see **Connected ✓**
 
 ---
 
@@ -91,94 +86,95 @@ This lets VaultFolio publish to your GitHub.
 1. Open Obsidian
 2. Settings → VaultFolio
 3. Fill in:
-   - Site name: Your name or brand
-   - Portfolio folder: portfolio (or anything else you like)
-   - GitHub repository: yourusername/my-portfolio
-   - GitHub token: paste token from Step 5
-4. Close settings
+   - **Site name**: Your name or brand
+   - **Portfolio folder**: `portfolio` (or any folder name you prefer)
+   - **GitHub repository**: `yourusername/my-portfolio`
+4. Click **Save Settings**
 
 ---
 
 ## Step 7: Create Your First Portfolio Note
 
-1. In Obsidian create a new folder called "portfolio"
+1. In Obsidian, create a new folder called `portfolio`
 2. Create a new note inside it
 3. Add this at the very top of the note:
+
 ```yaml
 ---
 title: My First Project
 published: true
+description: A short description of your project
 tags: [design, web]
 ---
 ```
-Add your post content here.
 
-4. Save the note
+4. Write your project content below the frontmatter
+5. Save the note
+
 <img width="228" height="189" alt="image" src="https://github.com/user-attachments/assets/1804a0ce-e6aa-4dd2-8a96-7ce81be41bb8" />
 <img width="322" height="281" alt="image" src="https://github.com/user-attachments/assets/329ec6cd-89a3-45a5-b62d-a547613f31e6" />
 
 ---
 
-## Step 9: First publication
+## Step 8: Build and Deploy
 
 1. Open Obsidian
-2. Click the VaultFolio icon in left sidebar
-3. (If you cannot see the new posts, click on Refresh button)
-4. Click "Build Site"
-5. Click "Deploy to GitHub"
-6. Wait 2-3 minutes, you will see a branch in your github.
+2. Click the VaultFolio icon in the left sidebar
+3. If your note doesn't appear, click **Refresh**
+4. Click **Build Site**
+5. Click **Deploy to GitHub**
+6. Wait 2-3 minutes for GitHub to process
+
 <img width="1692" height="1318" alt="image" src="https://github.com/user-attachments/assets/ab8b7c0a-82e3-4a2c-8b2c-5117a1944a10" />
-<img width="807" height="131" alt="image" src="https://github.com/user-attachments/assets/a9110323-ce70-422f-b606-634be0dcf3e7" />
+<img width="807" height="131" alt="image" src="https://github.com/user-attachments/assets/a9110323-ce07-422f-b606-634be0dcf3e7" />
 
 ---
 
-## Step 8: Enable GitHub Pages
+## Step 9: Enable GitHub Pages
+
+Do this once after your first deploy.
 
 1. Go to your GitHub repository
-2. Settings tab
-3. Left sidebar → Pages
-4. Under Branch → select gh-pages
-5. Click Save - important!
+2. Click the **Settings** tab
+3. Left sidebar → **Pages**
+4. Under Branch → select **gh-pages**
+5. Click **Save**
 
 <img width="749" height="518" alt="image" src="https://github.com/user-attachments/assets/8bf23e16-d520-40a7-a98d-30ec75efabec" />
 
----
+Wait 2-3 minutes. Your portfolio will be live at:
 
-## Step 9: Publish Your Portfolio
-
-1. Open Obsidian
-2. Click the VaultFolio icon in left sidebar
-3. Click "Build Site"
-4. Click "Deploy to GitHub"
-5. Wait 2-3 minutes
-6. Visit:
-   https://yourusername.github.io/my-portfolio
-
-Your portfolio is live. 🎉
+```
+https://yourusername.github.io/my-portfolio
+```
 
 ---
 
 ## Troubleshooting
 
 **"Git Repository is empty" error**
-→ Go to Step 4 and make sure you added a README file
+→ Go to Step 4 and make sure you checked "Add a README file" when creating the repo
 
-**"Bad credentials" error**
-→ Your GitHub token is wrong. Redo Step 5.
+**OAuth code expired**
+→ Codes expire after 15 minutes. Go to Settings → VaultFolio → Connect GitHub and start again
+
+**Authorization failed / not connected**
+→ Make sure you clicked **Authorize VaultFolio** on the GitHub device page, not just entered the code
 
 **Site not showing after deploy**
-→ Wait 5 minutes. GitHub Pages takes time.
-→ Make sure you completed Step 8.
+→ Wait 5 minutes. GitHub Pages takes time on first deploy.
+→ Make sure you completed Step 9 (enable gh-pages branch)
 
 **No notes showing in sidebar**
-→ Make sure your note is inside the "portfolio" folder
-→ Make sure you added published: true to frontmatter
+→ Make sure your note is inside the `portfolio` folder
+→ Make sure you added `published: true` to the frontmatter
 
 ---
 
 ## Need Help?
 
-Comment on the Reddit post or open an issue on GitHub.
+Open an issue on GitHub or comment on the Reddit post.
+
 https://github.com/thedozcompany/VaultFolio/issues
 
 https://www.reddit.com/r/ObsidianMD/comments/1stnbcx/built_a_plugin_to_publish_obsidian_notes_as_a/
