@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultFolio — Theme Preview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #ffffff;
+      color: #1a1a1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Shell header ── */
+    .shell-header {
+      border-bottom: 1px solid #e5e5e5;
+      padding: 28px 40px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .shell-logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #1a1a1a;
+      margin-bottom: 6px;
+    }
+    .shell-logo span { color: #7C3AED; }
+    .shell-subtitle {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #1a1a1a;
+      margin-bottom: 24px;
+      line-height: 1.2;
+    }
+    .shell-subtitle small {
+      display: block;
+      font-size: 15px;
+      font-weight: 400;
+      color: #777;
+      margin-top: 4px;
+      letter-spacing: 0;
+    }
+
+    /* ── Switcher ── */
+    .switcher {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .switcher-btn {
+      padding: 8px 20px;
+      border-radius: 100px;
+      border: 1.5px solid #d0d0d0;
+      background: #ffffff;
+      color: #555;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      outline: none;
+    }
+    .switcher-btn:hover {
+      border-color: #1a1a1a;
+      color: #1a1a1a;
+    }
+    .switcher-btn.active {
+      background: #7C3AED;
+      border-color: #7C3AED;
+      color: #ffffff;
+    }
+
+    /* ── Preview ── */
+    .preview-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 40px;
+    }
+    .preview-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+    .preview-frame-wrap {
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #f5f5f5;
+    }
+    .preview-bar {
+      background: #f0f0f0;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .preview-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .preview-dot:nth-child(1) { background: #ff5f57; }
+    .preview-dot:nth-child(2) { background: #febc2e; }
+    .preview-dot:nth-child(3) { background: #28c840; }
+    .preview-url {
+      margin-left: 8px;
+      background: #fff;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      padding: 3px 12px;
+      font-size: 12px;
+      color: #666;
+      flex: 1;
+      max-width: 300px;
+    }
+    #preview-frame {
+      width: 100%;
+      height: 680px;
+      border: none;
+      display: block;
+    }
+
+    /* ── CTA footer ── */
+    .shell-footer {
+      border-top: 1px solid #e5e5e5;
+      margin-top: 16px;
+      padding: 48px 40px;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+    }
+    .shell-footer h2 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      margin-bottom: 8px;
+    }
+    .shell-footer p {
+      font-size: 15px;
+      color: #666;
+      margin-bottom: 24px;
+    }
+    .cta-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .cta-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 22px;
+      border-radius: 100px;
+      font-size: 14px; font-weight: 500; font-family: inherit;
+      cursor: pointer; text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .cta-btn:hover { opacity: 0.8; }
+    .cta-btn-primary { background: #7C3AED; color: #fff; border: none; }
+    .cta-btn-secondary { background: #fff; color: #1a1a1a; border: 1.5px solid #d0d0d0; }
+    .shell-made {
+      margin-top: 32px;
+      font-size: 12px;
+      color: #bbb;
+    }
+
+    @media (max-width: 640px) {
+      .shell-header, .preview-wrap, .shell-footer { padding-left: 20px; padding-right: 20px; }
+      .shell-subtitle { font-size: 22px; }
+      #preview-frame { height: 520px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell-header">
+  <div class="shell-logo">Vault<span>Folio</span></div>
+  <div class="shell-subtitle">
+    Choose your portfolio theme
+    <small>Live preview with sample portfolio data</small>
+  </div>
+  <div class="switcher">
+    <button class="switcher-btn" data-theme="simple">Simple</button>
+    <button class="switcher-btn" data-theme="apple">Apple</button>
+    <button class="switcher-btn" data-theme="glass">Glassmorphism</button>
+    <button class="switcher-btn active" data-theme="dark">Dark Cinematic</button>
+  </div>
+</div>
+
+<div class="preview-wrap">
+  <div class="preview-label">Preview</div>
+  <div class="preview-frame-wrap">
+    <div class="preview-bar">
+      <div class="preview-dot"></div>
+      <div class="preview-dot"></div>
+      <div class="preview-dot"></div>
+      <div class="preview-url">alexrivera.github.io/portfolio</div>
+    </div>
+    <iframe id="preview-frame" title="Theme Preview" sandbox="allow-same-origin allow-scripts"></iframe>
+  </div>
+</div>
+
+<div class="shell-footer">
+  <h2>Get started with VaultFolio</h2>
+  <p>Turn your Obsidian notes into a live portfolio — no coding required.</p>
+  <div class="cta-buttons">
+    <a href="https://github.com/thedozcompany/VaultFolio" target="_blank" class="cta-btn cta-btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      View on GitHub
+    </a>
+    <a href="https://github.com/thedozcompany/VaultFolio#installation" target="_blank" class="cta-btn cta-btn-secondary">
+      Install Guide →
+    </a>
+  </div>
+  <div class="shell-made">Made with Obsidian &amp; VaultFolio</div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Fake portfolio data (matches builder.ts sample structure)
+// ─────────────────────────────────────────────────────────────────────────────
+const SITE_NAME    = "Alex Rivera";
+const HERO_TITLE   = "Alex Rivera";
+const HERO_SUBTITLE = "Brand Designer &amp; Developer crafting digital experiences with intention.";
+
+const PROJECTS = [
+  { slug: "flux-rebrand", title: "Flux Rebrand", desc: "Complete visual identity redesign for a leading fintech company.", tags: ["branding", "fintech"],  year: "2026" },
+  { slug: "calm-app",     title: "Calm App",     desc: "Mobile app redesign focused on mindfulness and user wellness.",   tags: ["ui/ux", "mobile"],    year: "2025" },
+  { slug: "nova-launch",  title: "Nova Launch",  desc: "Motion-driven product launch campaign with cinematic visuals.",   tags: ["motion", "product"],  year: "2025" },
+];
+
+const ALL_TAGS = ["branding", "fintech", "mobile", "motion", "product", "ui/ux"];
+
+function generateGradient(title, dark = false) {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash;
+  }
+  const hue1 = Math.abs(hash) % 360;
+  const sat1  = 60 + (Math.abs(hash >> 8)  % 20);
+  const lit1  = dark ? 35 + (Math.abs(hash >> 16) % 20) : 65 + (Math.abs(hash >> 16) % 15);
+  const hue2  = (hue1 + 40 + (Math.abs(hash >> 4) % 60)) % 360;
+  const sat2  = 55 + (Math.abs(hash >> 12) % 25);
+  const lit2  = dark ? 30 + (Math.abs(hash >> 20) % 25) : 60 + (Math.abs(hash >> 20) % 20);
+  const angle = Math.abs(hash >> 2) % 360;
+  return `linear-gradient(${angle}deg,hsl(${hue1},${sat1}%,${lit1}%),hsl(${hue2},${sat2}%,${lit2}%))`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared SVG icons (from builder.ts)
+// ─────────────────────────────────────────────────────────────────────────────
+const VT_GRID_ICON = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="8" height="8" rx="1"/><rect x="10" y="0" width="8" height="8" rx="1"/><rect x="0" y="10" width="8" height="8" rx="1"/><rect x="10" y="10" width="8" height="8" rx="1"/></svg>`;
+const VT_LIST_ICON = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="18" height="3" rx="1"/><rect x="0" y="7" width="18" height="3" rx="1"/><rect x="0" y="14" width="18" height="3" rx="1"/></svg>`;
+
+const VIEW_TOGGLE_HTML = `<div class="view-toggle-container">
+  <button id="btn-grid" class="view-toggle-btn active" data-view="grid" title="Grid view" aria-label="Grid view">${VT_GRID_ICON}</button>
+  <button id="btn-list" class="view-toggle-btn" data-view="list" title="List view" aria-label="List view">${VT_LIST_ICON}</button>
+</div>`;
+
+// mirrors renderViewToggleScript() from builder.ts
+const VIEW_TOGGLE_SCRIPT = `<script>(function(){
+  var KEY='vaultfolio-view-preference';
+  var c=document.getElementById('projects-container');
+  var bg=document.getElementById('btn-grid');
+  var bl=document.getElementById('btn-list');
+  if(!c||!bg||!bl)return;
+  function apply(v){
+    if(v==='list'){c.classList.remove('view-grid');c.classList.add('view-list');bg.classList.remove('active');bl.classList.add('active');}
+    else{c.classList.remove('view-list');c.classList.add('view-grid');bg.classList.add('active');bl.classList.remove('active');}
+  }
+  try{apply(localStorage.getItem(KEY)==='list'?'list':'grid');}catch(e){apply('grid');}
+  bg.addEventListener('click',function(){apply('grid');try{localStorage.setItem(KEY,'grid');}catch(e){}});
+  bl.addEventListener('click',function(){apply('list');try{localStorage.setItem(KEY,'list');}catch(e){}});
+})();<\/script>`;
+
+// mirrors renderTagFilterScript() from builder.ts; btnClass = CSS class for filter buttons
+function filterScript(btnClass, cardClass) {
+  cardClass = cardClass || 'vf-filter-card';
+  return `<script>document.addEventListener("DOMContentLoaded",function(){
+  var filters=document.querySelectorAll(".${btnClass}");
+  var cards=document.querySelectorAll(".${cardClass}");
+  filters.forEach(function(btn){
+    btn.addEventListener("click",function(){
+      filters.forEach(function(f){f.classList.remove("active");});
+      btn.classList.add("active");
+      var tag=btn.getAttribute("data-filter");
+      cards.forEach(function(card){
+        if(tag==="all"){card.style.display="";}
+        else{
+          var tList=(card.getAttribute("data-tags")||"").split(" ");
+          card.style.display=tList.includes(tag)?"":"none";
+        }
+      });
+    });
+  });
+});<\/script>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CALLOUT CSS (shared, from builder.ts CALLOUT_CSS constant)
+// ─────────────────────────────────────────────────────────────────────────────
+const CALLOUT_CSS = `
+.callout{border-radius:6px;padding:12px 16px;margin:16px 0;border-left:4px solid;}
+.callout-title{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;font-size:14px;}
+.callout-icon{font-size:16px;line-height:1;}
+.callout-content{font-size:14px;line-height:1.6;}
+.callout-note{background:#f0f4ff;border-color:#3b82f6;color:#1e3a8a;}
+.callout-info{background:#f0f9ff;border-color:#0ea5e9;color:#0c4a6e;}
+.callout-tip{background:#f0fdf4;border-color:#22c55e;color:#14532d;}
+.callout-warning{background:#fffbeb;border-color:#f59e0b;color:#78350f;}
+.callout-danger{background:#fff1f2;border-color:#ef4444;color:#7f1d1d;}
+.callout-question{background:#faf5ff;border-color:#a855f7;color:#4a1d96;}
+.callout-success{background:#f0fdf4;border-color:#22c55e;color:#14532d;}
+.callout-failure{background:#fff1f2;border-color:#ef4444;color:#7f1d1d;}
+.callout-bug{background:#fff1f2;border-color:#ef4444;color:#7f1d1d;}
+.callout-example{background:#f8fafc;border-color:#64748b;color:#1e293b;}
+.callout-quote{background:#f8fafc;border-color:#64748b;color:#1e293b;}
+.callout-abstract{background:#f0f9ff;border-color:#0ea5e9;color:#0c4a6e;}`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Theme HTML generators — each mirrors the real builder output
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── DARK (default) ────────────────────────────────────────────────────────────
+function darkHTML() {
+  const filterBar = `<div class="vf-filter-bar">
+  <button class="vf-filter-btn active" data-filter="all">All</button>
+  ${ALL_TAGS.map(t => `<button class="vf-filter-btn" data-filter="${t}">${t}</button>`).join("")}
+</div>`;
+
+  const cards = PROJECTS.map(p => {
+    const gradient = generateGradient(p.title, true);
+    const letter = p.title.charAt(0).toUpperCase();
+    const tagHtml = p.tags.map(t => `<span class="vf-card-tag">${t}</span>`).join("");
+    return `<a href="#" class="vf-card vf-filter-card" data-tags="${p.tags.join(" ")}" style="text-decoration:none">
+  <div class="vf-card-cover-placeholder" style="background:${gradient};display:flex;align-items:center;justify-content:center;overflow:hidden">
+    <span style="font-size:48px;font-weight:800;color:rgba(255,255,255,0.15);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${letter}</span>
+  </div>
+  <div class="vf-card-body">
+    <div class="vf-card-title">${p.title}</div>
+    <div class="vf-card-desc">${p.desc}</div>
+    <div class="vf-card-tags">${tagHtml}</div>
+    <span class="vf-card-link">Learn more →</span>
+  </div>
+</a>`;
+  }).join("\n");
+
+  const css = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#000000;color:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;height:auto;display:block}
+.vf-nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 48px;background:#000000;border-bottom:1px solid rgba(255,255,255,0.08);}
+.vf-nav-logo{font-size:15px;font-weight:700;letter-spacing:-0.3px;color:#FFFFFF;white-space:nowrap;flex-shrink:0;}
+.vf-nav-center{display:flex;align-items:center;}
+.vf-nav-center-link{color:rgba(255,255,255,0.6);font-size:14px;padding:4px 14px;transition:color 0.15s ease;}
+.vf-nav-center-link:hover{color:#FFFFFF;}
+.vf-nav-sep{color:rgba(255,255,255,0.2);font-size:14px;user-select:none;pointer-events:none;}
+.vf-nav-cta{background:#6B5CE7;color:#FFFFFF;border-radius:100px;padding:8px 20px;font-size:13px;font-weight:500;border:none;cursor:pointer;display:inline-block;flex-shrink:0;transition:background 0.15s ease;}
+.vf-nav-cta:hover{background:#5B4ED4;color:#FFFFFF;}
+.vf-hero{padding:160px 48px 80px;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:60% 40%;gap:40px;align-items:center;}
+.vf-hero-title{font-size:clamp(52px,7vw,96px);font-weight:800;line-height:1.0;color:#FFFFFF;letter-spacing:-3px;}
+.vf-hero-subtitle{font-size:16px;color:rgba(255,255,255,0.5);max-width:380px;line-height:1.7;margin-top:20px;}
+.vf-hero-right{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:24px;}
+.vf-hero-slash{font-size:80px;color:rgba(255,255,255,0.1);font-weight:300;line-height:1;}
+.vf-hero-work-btn{display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:10px 24px;color:#FFFFFF;font-size:14px;cursor:pointer;transition:border-color 0.2s ease;font-family:inherit;text-decoration:none;}
+.vf-hero-work-btn:hover{border-color:rgba(255,255,255,0.5);}
+.vf-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px;}
+.vf-filter-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:100px;padding:6px 16px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;font-family:inherit;transition:all 0.15s ease;}
+.vf-filter-btn.active,.vf-filter-btn:hover{background:#6B5CE7;border-color:#6B5CE7;color:#FFFFFF;}
+.vf-projects-section{padding:80px 48px;max-width:1200px;margin:0 auto;}
+.vf-section-header{display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.08);border-bottom:1px solid rgba(255,255,255,0.08);padding:16px 0;margin-bottom:40px;}
+.vf-section-label{font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.3);}
+.view-toggle-container{display:flex;gap:6px;align-items:center;}
+.view-toggle-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);transition:all 0.15s ease;}
+.view-toggle-btn svg{fill:rgba(255,255,255,0.4);display:block;}
+.view-toggle-btn.active{background:#6B5CE7;border-color:#6B5CE7;}
+.view-toggle-btn.active svg{fill:#fff;}
+#projects-container.view-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;}
+.vf-card{background:#0A0A0A;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;transition:all 0.3s ease;display:flex;flex-direction:column;color:#FFFFFF;}
+.vf-card:hover{border-color:rgba(107,92,231,0.4);transform:translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,0.4);}
+.vf-card-cover-placeholder{width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.vf-card-body{padding:20px;flex:1;display:flex;flex-direction:column;gap:8px;}
+.vf-card-title{font-size:18px;font-weight:600;color:#FFFFFF;}
+.vf-card-desc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.vf-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+.vf-card-tag{background:rgba(107,92,231,0.15);border:1px solid rgba(107,92,231,0.3);border-radius:100px;padding:3px 10px;font-size:11px;color:rgba(255,255,255,0.6);}
+.vf-card-link{color:#6B5CE7;font-size:13px;margin-top:auto;display:inline-block;transition:color 0.15s ease;}
+.vf-card:hover .vf-card-link{color:#FFFFFF;}
+#projects-container.view-list{display:flex;flex-direction:column;}
+#projects-container.view-list .vf-card{flex-direction:row;border-radius:0;border:none;border-top:1px solid rgba(255,255,255,0.06);padding:20px 0;background:transparent;gap:20px;transform:none!important;box-shadow:none!important;}
+#projects-container.view-list .vf-card:hover{background:rgba(255,255,255,0.02);}
+#projects-container.view-list .vf-card-cover-placeholder{width:160px;min-width:160px;height:100px;aspect-ratio:unset;border-radius:8px;flex-shrink:0;}
+#projects-container.view-list .vf-card-body{padding:0;}
+footer{border-top:1px solid rgba(255,255,255,0.08);}
+.vf-footer{padding:32px 48px;max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;}
+.vf-footer-copy{color:rgba(255,255,255,0.3);font-size:13px;}
+.vf-footer-brand{color:rgba(255,255,255,0.3);font-size:13px;}
+.vf-footer-links{display:flex;gap:20px;}
+${CALLOUT_CSS}`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${SITE_NAME}</title>
+<style>${css}</style></head>
+<body>
+<nav class="vf-nav">
+  <div class="vf-nav-logo">${SITE_NAME}</div>
+  <div class="vf-nav-center">
+    <a href="#work" class="vf-nav-center-link">Work</a><span class="vf-nav-sep">·</span><a href="#about" class="vf-nav-center-link">About</a>
+  </div>
+  <a href="#work" class="vf-nav-cta">View Work</a>
+</nav>
+<div class="vf-hero">
+  <div>
+    <h1 class="vf-hero-title">${HERO_TITLE}</h1>
+    <p class="vf-hero-subtitle">Brand Designer &amp; Developer crafting digital experiences with intention.</p>
+  </div>
+  <div class="vf-hero-right">
+    <span class="vf-hero-slash">/</span>
+    <a href="#work" class="vf-hero-work-btn">View Work →</a>
+  </div>
+</div>
+<section id="work">
+  <div class="vf-projects-section">
+    <div class="vf-section-header">
+      <span class="vf-section-label">Selected Work</span>
+      ${VIEW_TOGGLE_HTML}
+    </div>
+    ${filterBar}
+    <div id="projects-container" class="projects-grid view-grid">
+      ${cards}
+    </div>
+  </div>
+</section>
+<footer>
+  <div class="vf-footer">
+    <span class="vf-footer-copy">&copy; 2026 ${SITE_NAME}</span>
+    <span class="vf-footer-brand">Built with VaultFolio</span>
+    <div class="vf-footer-links"></div>
+  </div>
+</footer>
+${VIEW_TOGGLE_SCRIPT}
+${filterScript('vf-filter-btn')}
+</body></html>`;
+}
+
+// ── APPLE ─────────────────────────────────────────────────────────────────────
+function appleHTML() {
+  const filterBar = `<div class="vf-filter-bar">
+  <button class="vf-filter-btn active" data-filter="all">All</button>
+  ${ALL_TAGS.map(t => `<button class="vf-filter-btn" data-filter="${t}">${t}</button>`).join("")}
+</div>`;
+
+  const cards = PROJECTS.map(p => {
+    const gradient = generateGradient(p.title, false);
+    const letter = p.title.charAt(0).toUpperCase();
+    const tagHtml = p.tags.map(t => `<span class="vf-tag-ap">${t}</span>`).join("");
+    return `<a href="#" class="vf-card-ap vf-filter-card" data-tags="${p.tags.join(" ")}" style="text-decoration:none">
+  <div class="vf-card-ap-cover-placeholder" style="background:${gradient};display:flex;align-items:center;justify-content:center;overflow:hidden">
+    <span style="font-size:64px;font-weight:800;color:rgba(255,255,255,0.25);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${letter}</span>
+  </div>
+  <div class="vf-card-ap-body">
+    <div class="vf-card-ap-title">${p.title}</div>
+    <div class="vf-card-ap-desc">${p.desc}</div>
+    <div class="vf-card-ap-tags">${tagHtml}</div>
+    <div class="vf-card-ap-link">Learn more &gt;</div>
+  </div>
+</a>`;
+  }).join("\n");
+
+  const css = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body.vf-apple{background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;}
+.vf-apple a{color:inherit;text-decoration:none;}
+.vf-apple img{max-width:100%;height:auto;display:block;border-radius:12px;}
+.vf-nav-ap{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.7);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid rgba(0,0,0,0.05);display:flex;justify-content:space-between;align-items:center;padding:0 40px;height:52px;}
+.vf-nav-ap-logo{font-weight:600;font-size:17px;letter-spacing:-0.01em;color:#1d1d1f;}
+.vf-hero-ap{text-align:center;padding:120px 40px 80px;max-width:980px;margin:0 auto;}
+.vf-hero-ap-title{font-size:clamp(48px,8vw,80px);font-weight:700;letter-spacing:-0.015em;line-height:1.05;color:#1d1d1f;margin-bottom:24px;}
+.vf-hero-ap-subtitle{font-size:24px;font-weight:400;color:#86868b;line-height:1.33337;letter-spacing:.009em;max-width:680px;margin:0 auto;}
+.vf-filter-bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:32px;}
+.vf-filter-btn{background:rgba(0,0,0,0.05);color:#1d1d1f;border:none;padding:8px 16px;border-radius:100px;font-size:14px;cursor:pointer;transition:all 0.2s;font-family:inherit;font-weight:400;}
+.vf-filter-btn:hover{background:rgba(0,0,0,0.1);}
+.vf-filter-btn.active{background:#1d1d1f;color:#fff;font-weight:500;}
+.vf-projects-ap{padding:40px;max-width:1200px;margin:0 auto;}
+.vf-section-header-ap{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+.view-toggle-container{display:flex;gap:6px;align-items:center;}
+.view-toggle-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;background:transparent;border:1px solid #D2D2D7;transition:all 0.15s ease;}
+.view-toggle-btn svg{fill:#6E6E73;display:block;}
+.view-toggle-btn:hover:not(.active){background:#f0f0f0;border-color:#adadad;}
+.view-toggle-btn.active{background:#1d1d1f;border-color:#1d1d1f;}
+.view-toggle-btn.active svg{fill:#ffffff;}
+#projects-container.view-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;}
+.vf-card-ap{background:#ffffff;border-radius:18px;padding:0;display:flex;flex-direction:column;transition:transform 0.2s cubic-bezier(0,0,0.5,1),box-shadow 0.2s cubic-bezier(0,0,0.5,1);box-shadow:0 4px 24px rgba(0,0,0,0.04);overflow:hidden;}
+.vf-card-ap:hover{transform:scale(1.02);box-shadow:0 12px 48px rgba(0,0,0,0.08);}
+.vf-card-ap-cover-placeholder{width:100%;height:200px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.vf-card-ap-body{padding:32px;flex:1;display:flex;flex-direction:column;min-height:160px;}
+.vf-card-ap-title{font-size:28px;font-weight:600;letter-spacing:.004em;color:#1d1d1f;margin-bottom:12px;}
+.vf-card-ap-desc{font-size:17px;font-weight:400;color:#86868b;margin-bottom:24px;line-height:1.47;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.vf-card-ap-tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
+.vf-tag-ap{background:#f5f5f7;color:#1d1d1f;font-size:12px;font-weight:500;padding:4px 12px;border-radius:100px;}
+.vf-card-ap-link{margin-top:auto;color:#7C3AED;font-size:17px;font-weight:400;}
+.vf-card-ap-link:hover{text-decoration:underline;}
+#projects-container.view-list{display:flex;flex-direction:column;gap:0;}
+#projects-container.view-list .vf-card-ap{flex-direction:row;border-radius:12px;border-bottom:1px solid #f0f0f0;padding:16px 0;background:transparent;box-shadow:none;transition:background 0.15s ease,padding-left 0.2s ease;}
+#projects-container.view-list .vf-card-ap:hover{background:#f9f9fb;padding-left:8px;transform:none;box-shadow:none;}
+#projects-container.view-list .vf-card-ap-cover-placeholder{width:140px;height:90px;flex-shrink:0;border-radius:8px;}
+#projects-container.view-list .vf-card-ap-body{padding:0 0 0 20px;min-height:unset;}
+#projects-container.view-list .vf-card-ap-title{font-size:18px;margin-bottom:4px;}
+#projects-container.view-list .vf-card-ap-desc{font-size:13px;margin-bottom:8px;}
+#projects-container.view-list .vf-card-ap-link{display:none;}
+.vf-footer-ap{border-top:1px solid #d2d2d7;padding:32px 40px;text-align:center;font-size:12px;color:#86868b;max-width:980px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:12px;}
+${CALLOUT_CSS}`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${SITE_NAME}</title>
+<style>${css}</style></head>
+<body class="vf-apple">
+<nav class="vf-nav-ap">
+  <div class="vf-nav-ap-logo">${SITE_NAME}</div>
+  <div style="display:flex;gap:24px;align-items:center;">
+    <a href="#work" style="color:#7C3AED;font-size:14px;font-weight:400;">Work</a>
+    <a href="#about" style="color:#7C3AED;font-size:14px;font-weight:400;">About</a>
+  </div>
+</nav>
+<header class="vf-hero-ap">
+  <h1 class="vf-hero-ap-title">${HERO_TITLE}</h1>
+  <p class="vf-hero-ap-subtitle">Brand Designer &amp; Developer crafting digital experiences with precision and care.</p>
+</header>
+<section id="work" class="vf-projects-ap">
+  <div class="vf-section-header-ap">
+    ${VIEW_TOGGLE_HTML}
+  </div>
+  ${filterBar}
+  <div id="projects-container" class="projects-grid view-grid">
+    ${cards}
+  </div>
+</section>
+<footer class="vf-footer-ap">
+  <span>&copy; 2026 ${SITE_NAME} &mdash; Built with VaultFolio</span>
+</footer>
+${VIEW_TOGGLE_SCRIPT}
+${filterScript('vf-filter-btn')}
+</body></html>`;
+}
+
+// ── GLASSMORPHISM ─────────────────────────────────────────────────────────────
+function glassHTML() {
+  const filterBar = `<div class="vf-filter-bar-gl">
+  <button class="vf-filter-btn-gl active" data-filter="all">All</button>
+  ${ALL_TAGS.map(t => `<button class="vf-filter-btn-gl" data-filter="${t}">${t}</button>`).join("")}
+</div>`;
+
+  const cards = PROJECTS.map(p => {
+    const gradient = generateGradient(p.title, true);
+    const letter = p.title.charAt(0).toUpperCase();
+    const tagHtml = p.tags.map(t => `<span class="glass-tag">${t}</span>`).join("");
+    return `<a href="#" class="glass-card vf-filter-card" data-tags="${p.tags.join(" ")}" style="text-decoration:none">
+  <div class="glass-card-cover-placeholder" style="background:${gradient};overflow:hidden;display:flex;align-items:center;justify-content:center">
+    <span style="font-size:64px;font-weight:800;color:rgba(255,255,255,0.25);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${letter}</span>
+  </div>
+  <div class="glass-card-body">
+    <div class="glass-card-title">${p.title}</div>
+    <div class="glass-card-desc">${p.desc}</div>
+    <div class="glass-card-tags">${tagHtml}</div>
+    <span class="glass-card-link">Learn more →</span>
+  </div>
+</a>`;
+  }).join("\n");
+
+  const css = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body.vf-glass{background-color:#0D0D1A;background-image:radial-gradient(ellipse at 20% 20%,rgba(124,58,237,0.3) 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,rgba(139,92,246,0.2) 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,rgba(79,70,229,0.1) 0%,transparent 70%);background-attachment:fixed;color:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+.vf-glass a{color:inherit;text-decoration:none;}
+.vf-glass img{max-width:100%;height:auto;display:block;}
+.vf-nav-gl{position:fixed;top:16px;left:50%;transform:translateX(-50%);width:calc(100% - 48px);max-width:1100px;background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;z-index:100;}
+.vf-nav-gl-logo{font-weight:700;font-size:16px;color:#fff;}
+.vf-nav-gl-logo span{color:#FF4D00;}
+.vf-nav-gl-links{display:flex;gap:28px;align-items:center;}
+.vf-nav-gl-link{color:rgba(255,255,255,0.7);font-size:13px;transition:color 0.2s;}
+.vf-nav-gl-link:hover{color:#fff;}
+.vf-hero-gl{padding:160px 40px 80px;text-align:center;max-width:800px;margin:0 auto;}
+.vf-hero-gl-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);border-radius:100px;padding:4px 14px 4px 8px;font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:24px;}
+.vf-hero-gl-badge-dot{width:6px;height:6px;border-radius:50%;background:#7C3AED;box-shadow:0 0 8px #7C3AED;flex-shrink:0;}
+.vf-hero-gl-title{font-size:clamp(40px,7vw,72px);font-weight:700;letter-spacing:-2px;line-height:1.05;background:linear-gradient(135deg,#FFFFFF 0%,rgba(255,255,255,0.7) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:20px;}
+.vf-hero-gl-subtitle{font-size:17px;color:rgba(255,255,255,0.5);max-width:500px;margin:0 auto 36px;line-height:1.7;}
+.vf-hero-gl-cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.vf-hero-gl-btn-primary{background:linear-gradient(135deg,#7C3AED,#5B21B6);border:none;border-radius:12px;padding:12px 28px;color:white;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer;box-shadow:0 0 30px rgba(124,58,237,0.4);transition:box-shadow 0.3s ease;}
+.vf-hero-gl-btn-secondary{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 28px;color:rgba(255,255,255,0.8);font-size:15px;font-family:inherit;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:background 0.2s;}
+.vf-projects-gl{max-width:1200px;margin:0 auto;padding:0 40px 80px;}
+.vf-section-header-gl{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06);}
+.vf-section-label-gl{font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.4);}
+.view-toggle-container{display:flex;gap:6px;align-items:center;}
+.view-toggle-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);transition:all 0.15s ease;}
+.view-toggle-btn svg{fill:rgba(255,255,255,0.5);display:block;}
+.view-toggle-btn.active{background:rgba(124,58,237,0.6);border-color:rgba(124,58,237,0.4);}
+.view-toggle-btn.active svg{fill:#fff;}
+.vf-filter-bar-gl{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
+.vf-filter-btn-gl{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:100px;padding:6px 16px;font-size:13px;color:rgba(255,255,255,0.6);font-family:inherit;cursor:pointer;transition:all 0.2s;}
+.vf-filter-btn-gl:hover{background:rgba(255,255,255,0.1);color:#fff;}
+.vf-filter-btn-gl.active{background:rgba(124,58,237,0.4);border-color:rgba(124,58,237,0.5);color:#fff;}
+#projects-container.view-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;}
+.glass-card{background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;transition:all 0.3s ease;cursor:pointer;display:flex;flex-direction:column;text-decoration:none;color:inherit;}
+.glass-card:hover{background:rgba(255,255,255,0.07);border-color:rgba(124,58,237,0.3);transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,0.3),0 0 0 1px rgba(124,58,237,0.1);}
+.glass-card-cover-placeholder{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;}
+.glass-card-body{padding:20px;flex:1;display:flex;flex-direction:column;}
+.glass-card-title{font-size:17px;font-weight:600;color:#fff;margin-bottom:8px;}
+.glass-card-desc{font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.glass-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
+.glass-tag{background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.3);border-radius:100px;padding:3px 10px;font-size:11px;color:rgba(255,255,255,0.7);}
+.glass-card-link{color:#A78BFA;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:auto;padding-top:14px;transition:color 0.2s;}
+.glass-card-link:hover{color:#fff;}
+#projects-container.view-list{display:flex;flex-direction:column;gap:8px;}
+#projects-container.view-list .glass-card{flex-direction:row;border-radius:12px;padding:16px;background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.06);}
+#projects-container.view-list .glass-card:hover{background:rgba(255,255,255,0.06);border-color:rgba(124,58,237,0.2);transform:none;box-shadow:none;}
+#projects-container.view-list .glass-card-cover-placeholder{width:120px;height:80px;aspect-ratio:unset;flex-shrink:0;border-radius:8px;overflow:hidden;}
+#projects-container.view-list .glass-card-body{padding:0 0 0 16px;}
+#projects-container.view-list .glass-card-title{font-size:15px;}
+#projects-container.view-list .glass-card-link{display:none;}
+.vf-about-gl{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:24px;padding:60px 40px;margin:0 40px 60px;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;}
+.vf-about-gl-heading{font-size:36px;font-weight:700;color:#fff;margin-bottom:16px;letter-spacing:-1px;}
+.vf-about-gl-text{color:rgba(255,255,255,0.5);line-height:1.8;font-size:15px;}
+.vf-footer-gl{border-top:1px solid rgba(255,255,255,0.06);padding:32px 40px;display:flex;justify-content:space-between;align-items:center;color:rgba(255,255,255,0.4);font-size:13px;max-width:1200px;margin:0 auto;}
+.vf-footer-gl-accent{color:#FF4D00;}
+${CALLOUT_CSS}`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${SITE_NAME}</title>
+<style>${css}</style></head>
+<body class="vf-glass">
+<nav class="vf-nav-gl">
+  <div class="vf-nav-gl-logo">VAULT<span>FOLIO</span></div>
+  <div class="vf-nav-gl-links">
+    <a href="#work" class="vf-nav-gl-link">Work</a>
+    <a href="#about" class="vf-nav-gl-link">About</a>
+  </div>
+</nav>
+<header class="vf-hero-gl">
+  <div class="vf-hero-gl-badge"><span class="vf-hero-gl-badge-dot"></span>Portfolio — 2026</div>
+  <h1 class="vf-hero-gl-title">${HERO_TITLE}</h1>
+  <p class="vf-hero-gl-subtitle">Brand Designer &amp; Developer crafting digital experiences with intention.</p>
+  <div class="vf-hero-gl-cta-row">
+    <button class="vf-hero-gl-btn-primary">View Work</button>
+    <button class="vf-hero-gl-btn-secondary">About Me</button>
+  </div>
+</header>
+<section id="work" class="vf-projects-gl">
+  <div class="vf-section-header-gl">
+    <span class="vf-section-label-gl">Selected Work</span>
+    ${VIEW_TOGGLE_HTML}
+  </div>
+  ${filterBar}
+  <div id="projects-container" class="view-grid">
+    ${cards}
+  </div>
+</section>
+<section id="about" class="vf-about-gl">
+  <div>
+    <div class="vf-about-gl-heading">About</div>
+    <div class="vf-about-gl-text">A multidisciplinary creator focused on craft, clarity, and impact.</div>
+  </div>
+  <div>
+    <div class="vf-about-gl-text">"The details are not the details. They make the design."</div>
+  </div>
+</section>
+<footer class="vf-footer-gl">
+  <span>&copy; 2026 ${SITE_NAME}</span>
+  <span>Built with Vault<span class="vf-footer-gl-accent">Folio</span></span>
+  <span>${SITE_NAME}</span>
+</footer>
+${VIEW_TOGGLE_SCRIPT}
+${filterScript('vf-filter-btn-gl')}
+</body></html>`;
+}
+
+// ── SIMPLE ────────────────────────────────────────────────────────────────────
+function simpleHTML() {
+  const filterBar = `<div class="sp-filter-bar">
+  <button class="sp-filter-btn active" data-filter="all">All</button>
+  ${ALL_TAGS.map(t => `<button class="sp-filter-btn" data-filter="${t}">${t}</button>`).join("")}
+</div>`;
+
+  const cards = PROJECTS.map(p => {
+    const gradient = generateGradient(p.title, false);
+    const letter = p.title.charAt(0).toUpperCase();
+    const tagHtml = p.tags.map(t => `<span class="sp-tag">${t}</span>`).join("");
+    return `<a href="#" class="sp-card vf-filter-card" data-tags="${p.tags.join(" ")}" style="text-decoration:none">
+  <div class="sp-card-cover-placeholder" style="background:${gradient};display:flex;align-items:center;justify-content:center;overflow:hidden">
+    <span style="font-size:64px;font-weight:800;color:rgba(255,255,255,0.25);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${letter}</span>
+  </div>
+  <div class="sp-card-body">
+    <div class="sp-card-title">${p.title}</div>
+    <div class="sp-card-desc">${p.desc}</div>
+    <div class="sp-card-tags">${tagHtml}</div>
+    <span class="sp-card-link">Learn more →</span>
+  </div>
+</a>`;
+  }).join("\n");
+
+  const css = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#ffffff;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:16px;line-height:1.6;}
+a{color:#1a1a1a;text-decoration:none;}
+img{max-width:100%;height:auto;display:block;}
+.sp-nav{padding:20px 40px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;}
+.sp-nav-logo{font-size:16px;font-weight:600;}
+.sp-nav-links{display:flex;gap:20px;align-items:center;}
+.sp-nav-link{font-size:14px;color:#555;}
+.sp-nav-link:hover{color:#1a1a1a;}
+.sp-hero{padding:60px 40px 48px;max-width:800px;margin:0 auto;}
+.sp-hero h1{font-size:32px;font-weight:700;margin-bottom:12px;}
+.sp-hero p{font-size:16px;color:#555;}
+.sp-section{max-width:800px;margin:0 auto;padding:0 40px 80px;}
+.sp-section-heading{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:0;}
+.sp-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+.view-toggle-container{display:flex;gap:6px;align-items:center;}
+.view-toggle-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;background:transparent;border:1px solid #ddd;transition:all 0.15s ease;}
+.view-toggle-btn svg{fill:#aaa;display:block;}
+.view-toggle-btn.active{background:#1a1a1a;border-color:#1a1a1a;}
+.view-toggle-btn.active svg{fill:#fff;}
+.sp-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
+.sp-filter-btn{font-size:12px;padding:4px 12px;border:1px solid #ddd;background:none;cursor:pointer;color:#555;font-family:inherit;}
+.sp-filter-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a;}
+#projects-container.view-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+#projects-container.view-list{display:flex;flex-direction:column;gap:0;}
+.sp-card{display:block;border:1px solid #eee;color:#1a1a1a;overflow:hidden;}
+#projects-container.view-grid .sp-card{display:flex;flex-direction:column;}
+#projects-container.view-list .sp-card{display:flex;flex-direction:row;border-left:none;border-right:none;border-top:none;border-bottom:1px solid #eee;}
+#projects-container.view-list .sp-card:first-child{border-top:1px solid #eee;}
+.sp-card-cover-placeholder{width:100%;height:160px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-bottom:1px solid #eee;}
+#projects-container.view-list .sp-card-cover-placeholder{width:140px;min-width:140px;height:100px;flex-shrink:0;border-bottom:none;border-right:1px solid #eee;}
+.sp-card-body{padding:24px;display:flex;flex-direction:column;gap:8px;flex:1;}
+.sp-card-title{font-size:18px;font-weight:600;}
+.sp-card-desc{font-size:14px;color:#555;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.sp-card-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.sp-tag{font-size:12px;color:#777;padding:2px 8px;border:1px solid #ddd;}
+.sp-card-link{font-size:13px;color:#555;margin-top:auto;display:inline-block;}
+#projects-container.view-list .sp-card-body{padding:16px 20px;display:flex;flex-direction:column;justify-content:center;}
+.sp-footer{border-top:1px solid #eee;padding:32px 40px;text-align:center;font-size:13px;color:#999;}
+${CALLOUT_CSS}`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${SITE_NAME}</title>
+<style>${css}</style></head>
+<body>
+<nav class="sp-nav">
+  <a href="index.html" class="sp-nav-logo">${SITE_NAME}</a>
+  <div class="sp-nav-links">
+    <a href="#work" class="sp-nav-link">Work</a>
+    <a href="#about" class="sp-nav-link">About</a>
+  </div>
+</nav>
+<section class="sp-hero">
+  <h1>${HERO_TITLE}</h1>
+  <p>Brand Designer &amp; Developer. A collection of selected work.</p>
+</section>
+<section class="sp-section">
+  <div class="sp-section-header">
+    <div class="sp-section-heading">Work</div>
+    ${VIEW_TOGGLE_HTML}
+  </div>
+  ${filterBar}
+  <div id="projects-container" class="sp-cards view-grid">
+    ${cards}
+  </div>
+</section>
+<footer class="sp-footer">${SITE_NAME} &mdash; Built with VaultFolio</footer>
+${VIEW_TOGGLE_SCRIPT}
+${filterScript('sp-filter-btn')}
+</body></html>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Switcher logic
+// ─────────────────────────────────────────────────────────────────────────────
+const themeMap = {
+  dark:   darkHTML,
+  apple:  appleHTML,
+  glass:  glassHTML,
+  simple: simpleHTML,
+};
+
+const frame = document.getElementById("preview-frame");
+const buttons = document.querySelectorAll(".switcher-btn");
+
+function setTheme(name) {
+  const fn = themeMap[name];
+  if (!fn) return;
+  frame.srcdoc = fn();
+  buttons.forEach(b => b.classList.toggle("active", b.dataset.theme === name));
+}
+
+buttons.forEach(btn => {
+  btn.addEventListener("click", () => setTheme(btn.dataset.theme));
+});
+
+// Load default
+setTheme("dark");
+</script>
+
+</body>
+</html>
