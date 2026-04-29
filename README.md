@@ -144,7 +144,7 @@ Wait 2-3 minutes. Your portfolio will be live.
 
 Change theme in **Settings → VaultFolio → Theme**
 
-Preview live: [theme-preview page](https://thedozcompany.github.io/vaultfolio-portfolio/theme-preview.html)
+Preview live: [theme-preview page](https://thedozcompany.github.io/VaultFolio/theme-preview.html)
 
 ---
 
