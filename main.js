@@ -55,9 +55,11 @@ var Parser = class {
   }
   async getPublishedNotes() {
     var _a, _b, _c;
-    const folder = this.settings.portfolioFolder.replace(/\/+$/, "");
+    const folder = this.settings.portfolioFolder.trim().replace(/\/+$/, "");
+    if (!folder)
+      return [];
     const markdownFiles = this.app.vault.getMarkdownFiles().filter(
-      (f) => f.path === `${folder}/${f.name}` || f.path.startsWith(`${folder}/`)
+      (f) => f.path.startsWith(`${folder}/`)
     );
     const published = [];
     for (const file of markdownFiles) {
@@ -2543,7 +2545,7 @@ var VaultFolioSettingsTab = class extends import_obsidian3.PluginSettingTab {
     );
     new import_obsidian3.Setting(containerEl).setName("Portfolio folder").setDesc("Folder in your vault containing notes to publish.").addText(
       (text) => text.setPlaceholder("portfolio").setValue(this.plugin.settings.portfolioFolder).onChange(async (value) => {
-        this.plugin.settings.portfolioFolder = value;
+        this.plugin.settings.portfolioFolder = value.trim();
         await this.plugin.saveSettings();
       })
     );

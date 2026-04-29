@@ -49,7 +49,7 @@ export class VaultFolioSettingsTab extends PluginSettingTab {
           .setPlaceholder("portfolio")
           .setValue(this.plugin.settings.portfolioFolder)
           .onChange(async (value) => {
-            this.plugin.settings.portfolioFolder = value;
+            this.plugin.settings.portfolioFolder = value.trim();
             await this.plugin.saveSettings();
           })
       );

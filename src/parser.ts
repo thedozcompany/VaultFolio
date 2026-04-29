@@ -37,10 +37,11 @@ export class Parser {
   constructor(private app: App, private settings: { portfolioFolder: string; coverProperty: string }) {}
 
   async getPublishedNotes(): Promise<PublishedNote[]> {
-    const folder = this.settings.portfolioFolder.replace(/\/+$/, "");
+    const folder = this.settings.portfolioFolder.trim().replace(/\/+$/, "");
+    if (!folder) return [];
 
     const markdownFiles = this.app.vault.getMarkdownFiles().filter((f: TFile) =>
-      f.path === `${folder}/${f.name}` || f.path.startsWith(`${folder}/`)
+      f.path.startsWith(`${folder}/`)
     );
 
     const published: PublishedNote[] = [];
