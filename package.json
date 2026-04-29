@@ -1,6 +1,6 @@
 {
   "name": "vaultfolio",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Turn your Obsidian notes into a live portfolio",
   "main": "main.js",
   "scripts": {
