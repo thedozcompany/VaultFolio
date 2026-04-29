@@ -1,3 +1,5 @@
+import { requestUrl, RequestUrlResponse } from 'obsidian';
+
 export interface DeployConfig {
   githubToken: string;
   githubRepo: string;
@@ -111,10 +113,10 @@ async function getOrCreateBranch(
   branch: string,
   token: string
 ): Promise<{ commitSha: string; treeSha: string }> {
-  const refRes = await ghFetch("GET", `/repos/${owner}/${repo}/git/refs/heads/${branch}`, token);
+  const refRes = await ghRequest("GET", `/repos/${owner}/${repo}/git/refs/heads/${branch}`, token);
 
-  if (refRes.ok) {
-    const ref = (await refRes.json()) as { object: { sha: string } };
+  if (ok(refRes)) {
+    const ref = refRes.json as { object: { sha: string } };
     const commitSha = ref.object.sha;
     const commit = await ghJson<{ tree: { sha: string } }>(
       "GET",
@@ -125,17 +127,17 @@ async function getOrCreateBranch(
   }
 
   if (refRes.status !== 404) {
-    throw await buildApiError(refRes, "checking branch");
+    throw buildApiError(refRes, "checking branch");
   }
 
   // Branch doesn't exist — base it on main or master
   const baseSha = await findDefaultBranchSha(owner, repo, token);
 
-  const createRes = await ghFetch("POST", `/repos/${owner}/${repo}/git/refs`, token, {
+  const createRes = await ghRequest("POST", `/repos/${owner}/${repo}/git/refs`, token, {
     ref: `refs/heads/${branch}`,
     sha: baseSha,
   });
-  if (!createRes.ok) throw await buildApiError(createRes, "creating branch");
+  if (!ok(createRes)) throw buildApiError(createRes, "creating branch");
 
   const commit = await ghJson<{ tree: { sha: string } }>(
     "GET",
@@ -147,9 +149,9 @@ async function getOrCreateBranch(
 
 async function findDefaultBranchSha(owner: string, repo: string, token: string): Promise<string> {
   for (const name of ["main", "master"]) {
-    const res = await ghFetch("GET", `/repos/${owner}/${repo}/git/refs/heads/${name}`, token);
-    if (res.ok) {
-      const data = (await res.json()) as { object: { sha: string } };
+    const res = await ghRequest("GET", `/repos/${owner}/${repo}/git/refs/heads/${name}`, token);
+    if (ok(res)) {
+      const data = res.json as { object: { sha: string } };
       return data.object.sha;
     }
   }
@@ -214,13 +216,13 @@ async function updateRef(
   commitSha: string,
   token: string
 ): Promise<void> {
-  const res = await ghFetch(
+  const res = await ghRequest(
     "PATCH",
     `/repos/${owner}/${repo}/git/refs/heads/${branch}`,
     token,
     { sha: commitSha, force: true }
   );
-  if (!res.ok) throw await buildApiError(res, "updating branch ref");
+  if (!ok(res)) throw buildApiError(res, "updating branch ref");
 }
 
 // ── Stale-file helpers ────────────────────────────────────────────────────────
@@ -231,14 +233,14 @@ async function fetchExistingPaths(
   treeSha: string,
   token: string
 ): Promise<string[]> {
-  const res = await ghFetch(
+  const res = await ghRequest(
     "GET",
     `/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`,
     token
   );
   // A 404 or any error here just means no files to clean up yet
-  if (!res.ok) return [];
-  const data = (await res.json()) as { tree: Array<{ path: string; type: string }> };
+  if (!ok(res)) return [];
+  const data = res.json as { tree: Array<{ path: string; type: string }> };
   return data.tree
     .filter((item) => item.type === "blob")
     .map((item) => item.path);
@@ -250,15 +252,20 @@ function findStalePaths(existingPaths: string[], newPaths: Set<string>): string[
   );
 }
 
-// ── Fetch utilities ───────────────────────────────────────────────────────────
+// ── Request utilities ─────────────────────────────────────────────────────────
 
-function ghFetch(
+function ok(res: RequestUrlResponse): boolean {
+  return res.status >= 200 && res.status < 300;
+}
+
+function ghRequest(
   method: string,
   path: string,
   token: string,
   body?: unknown
-): Promise<Response> {
-  return fetch(`https://api.github.com${path}`, {
+): Promise<RequestUrlResponse> {
+  return requestUrl({
+    url: `https://api.github.com${path}`,
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -267,6 +274,7 @@ function ghFetch(
       "X-GitHub-Api-Version": "2022-11-28",
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    throw: false,
   });
 }
 
@@ -276,16 +284,16 @@ async function ghJson<T>(
   token: string,
   body?: unknown
 ): Promise<T> {
-  const res = await ghFetch(method, path, token, body);
-  if (!res.ok) throw await buildApiError(res, `${method} ${path}`);
-  return res.json() as Promise<T>;
+  const res = await ghRequest(method, path, token, body);
+  if (!ok(res)) throw buildApiError(res, `${method} ${path}`);
+  return res.json as T;
 }
 
-async function buildApiError(res: Response, context: string): Promise<Error> {
-  let detail = res.statusText;
+function buildApiError(res: RequestUrlResponse, context: string): Error {
+  let detail = String(res.status);
   try {
-    const body = (await res.json()) as { message?: string };
-    if (body.message) detail = body.message;
+    const body = res.json as { message?: string };
+    if (body?.message) detail = body.message;
   } catch { /* ignore parse errors */ }
 
   if (res.status === 401) {

@@ -3,6 +3,8 @@ export interface VaultFolioSettings {
   outputFolder: string;
   githubRepo: string;
   githubToken: string;
+  githubUsername: string;
+  coverProperty: string;
   siteName: string;
   theme: string;
   navLinks: string;
@@ -17,6 +19,8 @@ export const DEFAULT_SETTINGS: VaultFolioSettings = {
   outputFolder: "_site",
   githubRepo: "",
   githubToken: "",
+  githubUsername: "",
+  coverProperty: "cover",
   siteName: "My Portfolio",
   theme: "apple",
   navLinks: "Work: #work",

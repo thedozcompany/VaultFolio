@@ -28,7 +28,7 @@ __export(main_exports, {
   default: () => VaultFolioPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian3 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/settings.ts
 var DEFAULT_SETTINGS = {
@@ -36,6 +36,8 @@ var DEFAULT_SETTINGS = {
   outputFolder: "_site",
   githubRepo: "",
   githubToken: "",
+  githubUsername: "",
+  coverProperty: "cover",
   siteName: "My Portfolio",
   theme: "apple",
   navLinks: "Work: #work",
@@ -69,12 +71,15 @@ var Parser = class {
         if (Array.isArray(frontmatter.tags)) {
           frontmatter.tags = frontmatter.tags.map((t) => String(t).toLowerCase());
         }
-        const rawCover = frontmatter.cover;
+        const coverProp = this.settings.coverProperty || "cover";
+        const rawCover = frontmatter[coverProp];
         if (rawCover != null && typeof rawCover !== "string") {
           const obj = rawCover;
-          frontmatter.cover = String(
-            (_c = (_b = (_a = obj.path) != null ? _a : obj.link) != null ? _b : obj.displayText) != null ? _c : rawCover
-          );
+          frontmatter.cover = String((_c = (_b = (_a = obj.path) != null ? _a : obj.link) != null ? _b : obj.displayText) != null ? _c : rawCover);
+        } else if (typeof rawCover === "string" && rawCover !== "") {
+          frontmatter.cover = rawCover;
+        } else {
+          frontmatter.cover = void 0;
         }
         if (frontmatter.published !== true)
           continue;
@@ -93,8 +98,35 @@ var Parser = class {
     return published;
   }
 };
-async function getPublishedNotes(app, portfolioFolder) {
-  return new Parser(app, { portfolioFolder }).getPublishedNotes();
+var RESERVED_PROPERTY_KEYS = /* @__PURE__ */ new Set([
+  "title",
+  "published",
+  "tags",
+  "cover",
+  "date",
+  "show_properties"
+]);
+function buildPublicProperties(fm) {
+  const raw = fm.show_properties;
+  if (!Array.isArray(raw) || raw.length === 0)
+    return {};
+  const result = {};
+  for (const key of raw) {
+    if (typeof key !== "string" || RESERVED_PROPERTY_KEYS.has(key))
+      continue;
+    const value = fm[key];
+    if (value === null || value === void 0 || value === "")
+      continue;
+    if (Array.isArray(value)) {
+      result[key] = value.map((v) => String(v));
+    } else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      result[key] = String(value);
+    }
+  }
+  return result;
+}
+async function getPublishedNotes(app, portfolioFolder, coverProperty = "cover") {
+  return new Parser(app, { portfolioFolder, coverProperty }).getPublishedNotes();
 }
 function parseNote(rawContent, fallbackSlug, cachedFrontmatter) {
   var _a, _b, _c, _d;
@@ -103,7 +135,8 @@ function parseNote(rawContent, fallbackSlug, cachedFrontmatter) {
   const slug = (_b = frontmatter.slug) != null ? _b : slugify((_a = frontmatter.title) != null ? _a : fallbackSlug);
   const basename = (_d = (_c = fallbackSlug.split("/").pop()) == null ? void 0 : _c.replace(/\.md$/i, "")) != null ? _d : fallbackSlug;
   const displayTitle = typeof frontmatter.title === "string" && frontmatter.title.trim() ? frontmatter.title.trim() : basename;
-  return { frontmatter, body, slug, displayTitle };
+  const publicProperties = buildPublicProperties(frontmatter);
+  return { frontmatter, body, slug, displayTitle, publicProperties };
 }
 function extractFrontmatterFromContent(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -177,7 +210,21 @@ function slugify(text) {
 }
 
 // src/builder.ts
-var CARD_COLORS = ["#1A1A2E", "#16213E", "#1B1B2F", "#0F3460", "#1C1C1E", "#2D1B69"];
+function generateGradient(title, dark = false) {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash;
+  }
+  const hue1 = Math.abs(hash) % 360;
+  const sat1 = 60 + Math.abs(hash >> 8) % 20;
+  const lit1 = dark ? 35 + Math.abs(hash >> 16) % 20 : 65 + Math.abs(hash >> 16) % 15;
+  const hue2 = (hue1 + 40 + Math.abs(hash >> 4) % 60) % 360;
+  const sat2 = 55 + Math.abs(hash >> 12) % 25;
+  const lit2 = dark ? 30 + Math.abs(hash >> 20) % 25 : 60 + Math.abs(hash >> 20) % 20;
+  const angle = Math.abs(hash >> 2) % 360;
+  return `linear-gradient(${angle}deg,hsl(${hue1},${sat1}%,${lit1}%),hsl(${hue2},${sat2}%,${lit2}%))`;
+}
 var CALLOUT_ICONS = {
   note: "\u{1F4DD}",
   info: "\u2139\uFE0F",
@@ -211,471 +258,310 @@ var CALLOUT_CSS = `
 .callout-abstract { background: #f0f9ff; border-color: #0ea5e9; color: #0c4a6e; }
 `.trim();
 var BASE_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
-  background: #0A0A0A;
+  background: #000000;
   color: #FFFFFF;
-  font-family: 'DM Sans', sans-serif;
-  line-height: 1.5;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 a { color: inherit; text-decoration: none; }
 img { max-width: 100%; height: auto; display: block; }
 
 /* \u2500\u2500 Navigation \u2500\u2500 */
 .vf-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-  height: 64px;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 60px;
-  background: transparent;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
-  border-bottom: 1px solid transparent;
-  transition: background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease;
-}
-.vf-nav.scrolled {
-  background: rgba(0,0,0,0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom-color: rgba(255,255,255,0.1);
+  padding: 16px 48px;
+  background: #000000;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .vf-nav-logo {
-  font-family: 'Syne', sans-serif;
-  font-size: 16px; font-weight: 700;
-  letter-spacing: 0.05em; text-transform: uppercase;
-  color: #FFFFFF;
+  font-size: 15px; font-weight: 700; letter-spacing: -0.3px;
+  color: #FFFFFF; white-space: nowrap; flex-shrink: 0;
 }
-.vf-nav-links { display: flex; gap: 36px; }
-.vf-nav-link {
-  font-size: 13px; font-weight: 400; letter-spacing: 0.04em;
-  color: rgba(255,255,255,0.7);
-  transition: color 0.2s ease;
+.vf-nav-center {
+  display: flex; align-items: center;
 }
-.vf-nav-link:hover { color: #FFFFFF; }
+.vf-nav-center-link {
+  color: rgba(255,255,255,0.6); font-size: 14px;
+  padding: 4px 14px; transition: color 0.15s ease;
+}
+.vf-nav-center-link:hover { color: #FFFFFF; }
+.vf-nav-sep {
+  color: rgba(255,255,255,0.2); font-size: 14px;
+  user-select: none; pointer-events: none;
+}
+.vf-nav-cta {
+  background: #6B5CE7; color: #FFFFFF;
+  border-radius: 100px; padding: 8px 20px;
+  font-size: 13px; font-weight: 500; border: none;
+  cursor: pointer; display: inline-block; flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.vf-nav-cta:hover { background: #5B4ED4; color: #FFFFFF; }
 
 /* \u2500\u2500 Hero \u2500\u2500 */
 .vf-hero {
-  height: 100vh;
-  min-height: 600px;
-  background: #0A0A0A;
-  display: flex; align-items: center; justify-content: center;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-.vf-hero::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255,77,0,0.07) 0%, transparent 70%);
-  pointer-events: none;
-}
-.vf-hero-inner { position: relative; z-index: 1; padding: 0 40px; max-width: 1100px; }
-.vf-hero-label {
-  display: block; margin-bottom: 32px;
-  font-size: 11px; font-weight: 400;
-  letter-spacing: 0.3em; text-transform: uppercase;
-  color: rgba(255,255,255,0.4);
+  padding: 160px 48px 80px;
+  max-width: 1200px; margin: 0 auto;
+  display: grid; grid-template-columns: 60% 40%; gap: 40px;
+  align-items: center;
 }
 .vf-hero-title {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(60px, 12vw, 140px);
-  font-weight: 800;
-  letter-spacing: -4px;
-  line-height: 0.9;
-  color: #FFFFFF;
-  margin-bottom: 32px;
-}
-.vf-hero-title em {
-  font-style: italic;
-  color: #FF4D00;
+  font-size: clamp(52px, 7vw, 96px);
+  font-weight: 800; line-height: 1.0;
+  color: #FFFFFF; letter-spacing: -3px;
 }
 .vf-hero-subtitle {
-  font-size: 16px; font-weight: 300;
-  color: rgba(255,255,255,0.5);
-  line-height: 1.7;
-  max-width: 480px;
-  margin: 0 auto 60px;
+  font-size: 16px; color: rgba(255,255,255,0.5);
+  max-width: 380px; line-height: 1.7; margin-top: 20px;
 }
-.vf-scroll-indicator {
-  position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-  color: rgba(255,255,255,0.3);
-  font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+.vf-hero-right {
+  display: flex; flex-direction: column;
+  align-items: flex-end; justify-content: center; gap: 24px;
 }
-.vf-scroll-line {
-  width: 1px; height: 60px;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
-  animation: vf-scroll-pulse 2s ease-in-out infinite;
+.vf-hero-slash {
+  font-size: 80px; color: rgba(255,255,255,0.1);
+  font-weight: 300; line-height: 1;
 }
-@keyframes vf-scroll-pulse {
-  0%, 100% { opacity: 0.3; transform: scaleY(1); }
-  50% { opacity: 0.8; transform: scaleY(0.6); }
+.vf-hero-work-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 100px; padding: 10px 24px;
+  color: #FFFFFF; font-size: 14px; cursor: pointer;
+  transition: border-color 0.2s ease; font-family: inherit;
+}
+.vf-hero-work-btn:hover { border-color: rgba(255,255,255,0.5); color: #FFFFFF; }
+
+/* \u2500\u2500 Filter bar \u2500\u2500 */
+.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 32px; }
+.vf-filter-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 100px; padding: 6px 16px;
+  font-size: 12px; color: rgba(255,255,255,0.5);
+  cursor: pointer; font-family: inherit; transition: all 0.15s ease;
+}
+.vf-filter-btn.active, .vf-filter-btn:hover {
+  background: #6B5CE7; border-color: #6B5CE7; color: #FFFFFF;
 }
 
-/* \u2500\u2500 Projects strip section \u2500\u2500 */
+/* \u2500\u2500 Projects section \u2500\u2500 */
 .vf-projects-section {
-  background: #0A0A0A;
-  padding: 120px 60px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 80px 48px; max-width: 1200px; margin: 0 auto;
+}
+.vf-section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 16px 0; margin-bottom: 40px;
 }
 .vf-section-label {
-  display: block; margin-bottom: 60px;
-  font-size: 11px; font-weight: 400;
-  letter-spacing: 0.3em; text-transform: uppercase;
-  color: rgba(255,255,255,0.3);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+  text-transform: uppercase; color: rgba(255,255,255,0.3);
 }
+.view-toggle-container { display: flex; gap: 6px; align-items: center; }
+.view-toggle-btn {
+  width: 32px; height: 32px; display: flex; align-items: center;
+  justify-content: center; border-radius: 4px; cursor: pointer;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1); transition: all 0.15s ease;
+}
+.view-toggle-btn svg { fill: rgba(255,255,255,0.4); display: block; }
+.view-toggle-btn.active { background: #6B5CE7; border-color: #6B5CE7; }
+.view-toggle-btn.active svg { fill: #fff; }
+.vf-no-projects { color: rgba(255,255,255,0.3); font-size: 15px; padding: 40px 0; }
 
-/* \u2500\u2500 Project row \u2500\u2500 */
-.vf-project-row {
-  display: grid;
-  grid-template-columns: 60px 80px 1fr auto;
-  align-items: center;
-  gap: 40px;
-  padding: 40px 0;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  text-decoration: none; color: #FFFFFF;
-  transition: background 0.3s ease;
-  cursor: pointer;
-  border-radius: 4px;
-  margin: 0 -20px;
-  padding-left: 20px;
-  padding-right: 20px;
+/* \u2500\u2500 Project cards (grid) \u2500\u2500 */
+#projects-container.view-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;
 }
-.vf-project-row:hover { background: rgba(255,255,255,0.03); }
-.vf-project-row:last-child { border-bottom: 1px solid rgba(255,255,255,0.1); }
-.vf-project-num {
-  font-family: 'Syne', sans-serif;
-  font-size: 12px; font-weight: 400;
-  color: rgba(255,255,255,0.2);
-  letter-spacing: 0.1em;
-}
-.vf-project-name {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(28px, 4vw, 56px);
-  font-weight: 700;
-  letter-spacing: -1.5px;
-  line-height: 1;
+.vf-card {
+  background: #0A0A0A; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px; overflow: hidden;
+  transition: all 0.3s ease; display: flex; flex-direction: column;
   color: #FFFFFF;
-  transition: color 0.3s ease;
 }
-.vf-project-row:hover .vf-project-name { color: #FF4D00; }
-.vf-project-meta-right {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
-  flex-shrink: 0;
+.vf-card:hover {
+  border-color: rgba(107,92,231,0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
 }
-.vf-project-year {
-  font-size: 12px; color: rgba(255,255,255,0.3);
-  letter-spacing: 0.08em;
+.vf-card-cover { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+.vf-card-cover-placeholder {
+  width: 100%; aspect-ratio: 16/9;
+  background: linear-gradient(135deg, #0D0D1A, #1a1a2e);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
-.vf-project-tags-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.vf-project-tag-pill {
-  font-size: 11px; font-weight: 400;
-  color: rgba(255,255,255,0.6);
-  padding: 4px 12px;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 100px;
-  white-space: nowrap;
+.vf-card-body { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.vf-card-title { font-size: 18px; font-weight: 600; color: #FFFFFF; }
+.vf-card-desc {
+  font-size: 13px; color: rgba(255,255,255,0.4); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.vf-no-projects {
-  font-size: 16px; color: rgba(255,255,255,0.3);
-  padding: 60px 0;
+.vf-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.vf-card-tag {
+  background: rgba(107,92,231,0.15); border: 1px solid rgba(107,92,231,0.3);
+  border-radius: 100px; padding: 3px 10px;
+  font-size: 11px; color: rgba(255,255,255,0.6);
 }
+.vf-card-link {
+  color: #6B5CE7; font-size: 13px; margin-top: auto;
+  display: inline-block; transition: color 0.15s ease;
+}
+.vf-card:hover .vf-card-link { color: #FFFFFF; }
 
-/* \u2500\u2500 Row cover thumbnail \u2500\u2500 */
-.vf-project-row-cover {
-  width: 80px; height: 45px;
-  border-radius: 4px; object-fit: cover; display: block;
-  flex-shrink: 0; align-self: center;
+/* \u2500\u2500 Project cards (list) \u2500\u2500 */
+#projects-container.view-list { display: flex; flex-direction: column; }
+#projects-container.view-list .vf-card {
+  flex-direction: row; border-radius: 0; border: none;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 20px 0; background: transparent; gap: 20px;
+  transform: none !important; box-shadow: none !important;
 }
-.vf-project-row-cover-placeholder {
-  width: 80px; height: 45px; border-radius: 4px;
-  background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
-  flex-shrink: 0; align-self: center;
+#projects-container.view-list .vf-card:hover { background: rgba(255,255,255,0.02); }
+#projects-container.view-list .vf-card-cover {
+  width: 160px; min-width: 160px; height: 100px; aspect-ratio: unset;
+  border-radius: 8px; flex-shrink: 0;
 }
-
-/* \u2500\u2500 Filters \u2500\u2500 */
-.vf-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; margin-bottom: 32px; }
-.vf-filter-btn {
-  background: transparent; border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.6);
-  padding: 6px 16px; border-radius: 100px; font-size: 13px; cursor: pointer; transition: all 0.2s; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+#projects-container.view-list .vf-card-cover-placeholder {
+  width: 160px; min-width: 160px; height: 100px; aspect-ratio: unset;
+  border-radius: 8px; flex-shrink: 0;
 }
-.vf-filter-btn:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
-.vf-filter-btn.active { background: #fff; color: #000; border-color: #fff; font-weight: 500; }
+#projects-container.view-list .vf-card-body { padding: 0; }
 
 /* \u2500\u2500 About \u2500\u2500 */
-.vf-about { background: #111111; padding: 120px 60px; }
-.vf-about-inner {
-  max-width: 1400px; margin: 0 auto;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start;
+.vf-about {
+  padding: 80px 48px; max-width: 1200px; margin: 0 auto;
+  border-top: 1px solid rgba(255,255,255,0.08);
 }
-.vf-about-left {}
-.vf-about-heading {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(36px, 4vw, 52px);
-  font-weight: 700;
-  color: #FFFFFF;
-  line-height: 1.1;
-  letter-spacing: -1.5px;
-  margin-bottom: 24px;
+.vf-about-text {
+  font-size: 32px; font-weight: 700; color: #FFFFFF;
+  line-height: 1.3; max-width: 500px;
 }
-.vf-about-body {
-  font-size: 16px; font-weight: 300;
-  color: rgba(255,255,255,0.5);
-  line-height: 1.8;
-  max-width: 480px;
+
+/* \u2500\u2500 Quote \u2500\u2500 */
+.vf-quote {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 60px 48px; max-width: 1200px; margin: 0 auto;
 }
-.vf-about-right {}
-.vf-about-detail {
-  display: flex; flex-direction: column; gap: 28px;
-  padding-top: 8px;
+.vf-quote-text {
+  font-size: 18px; color: rgba(255,255,255,0.6);
+  max-width: 600px; line-height: 1.7; font-style: italic;
 }
-.vf-about-detail-item {}
-.vf-about-detail-label {
-  font-size: 10px; font-weight: 500; letter-spacing: 0.25em; text-transform: uppercase;
-  color: rgba(255,255,255,0.25);
-  margin-bottom: 8px;
-}
-.vf-about-detail-value {
-  font-size: 15px; color: rgba(255,255,255,0.7);
-  font-weight: 300;
-}
-.vf-skills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.vf-skill {
-  font-size: 12px; color: rgba(255,255,255,0.5);
-  padding: 6px 14px;
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 100px;
-  font-weight: 400;
-  transition: border-color 0.2s, color 0.2s;
-}
-.vf-skill:hover { border-color: rgba(255,77,0,0.5); color: #FF4D00; }
 
 /* \u2500\u2500 Footer \u2500\u2500 */
+footer { border-top: 1px solid rgba(255,255,255,0.08); }
 .vf-footer {
-  background: #0A0A0A;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  padding: 48px 60px;
-  display: flex; align-items: center; justify-content: space-between;
+  padding: 32px 48px; max-width: 1200px; margin: 0 auto;
+  display: flex; justify-content: space-between; align-items: center;
 }
-.vf-footer-left {
-  font-family: 'Syne', sans-serif;
-  font-size: 14px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-  color: #FFFFFF;
-}
-.vf-footer-right {
-  font-size: 12px; color: rgba(255,255,255,0.3);
-}
-.vf-footer-right a { color: #FF4D00; transition: opacity 0.2s; }
-.vf-footer-right a:hover { opacity: 0.7; }
+.vf-footer-copy { color: rgba(255,255,255,0.3); font-size: 13px; }
+.vf-footer-brand { color: rgba(255,255,255,0.3); font-size: 13px; }
+.vf-footer-links { display: flex; gap: 20px; }
+.vf-footer-link { color: rgba(255,255,255,0.3); font-size: 12px; transition: color 0.15s ease; }
+.vf-footer-link:hover { color: rgba(255,255,255,0.6); }
 
 /* \u2500\u2500 Back button \u2500\u2500 */
-.vf-back-wrap {
-  position: absolute; top: 80px; left: 60px; z-index: 10;
-}
+.vf-back-wrap { padding: 100px 48px 0; max-width: 1200px; margin: 0 auto; }
 .vf-back-btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 13px; font-weight: 400; letter-spacing: 0.04em;
-  color: rgba(255,255,255,0.7);
-  transition: color 0.2s ease;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 100px; padding: 8px 16px;
+  color: rgba(255,255,255,0.6); font-size: 13px;
+  transition: all 0.15s ease;
 }
-.vf-back-btn::before {
-  content: '\u2190';
-  font-size: 16px;
-}
-.vf-back-btn:hover { color: #FFFFFF; }
+.vf-back-btn:hover { color: #FFFFFF; border-color: rgba(255,255,255,0.4); }
 
 /* \u2500\u2500 Project page \u2500\u2500 */
-.vf-project-page { background: #0A0A0A; min-height: 100vh; position: relative; }
-
-.vf-project-hero-block {
-  width: 100%;
-  height: 50vh; min-height: 400px;
-  display: flex; align-items: center; justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-.vf-project-hero-block::after {
-  content: '';
-  position: absolute; inset: 0;
-  background: rgba(0,0,0,0.35);
-}
+body.vf-project-page { background: #000000; }
+.vf-project-header { padding: 40px 48px; max-width: 1200px; margin: 0 auto; }
 .vf-project-hero-title {
-  position: relative; z-index: 1;
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(36px, 5vw, 72px);
-  font-weight: 800;
-  letter-spacing: -2px;
-  line-height: 1;
-  color: #FFFFFF;
-  text-align: center;
-  padding: 0 40px;
+  font-size: clamp(40px, 6vw, 80px);
+  font-weight: 800; color: #FFFFFF;
+  letter-spacing: -2px; line-height: 1.0; margin-bottom: 20px;
 }
-
-.vf-project-content {
-  max-width: 720px; margin: 0 auto;
-  padding: 80px 40px 120px;
-}
-.vf-project-content-title {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(28px, 3vw, 42px);
-  font-weight: 700;
-  letter-spacing: -1px;
-  color: #FFFFFF;
-  margin-bottom: 12px;
-}
-.vf-project-date-line {
-  font-size: 13px; color: rgba(255,255,255,0.3);
-  letter-spacing: 0.08em;
-  margin-bottom: 20px;
-}
-.vf-project-tags-line { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 48px; }
+.vf-project-date-line { font-size: 13px; color: rgba(255,255,255,0.3); margin-bottom: 16px; }
+.vf-project-tags-line { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
 .vf-project-page-tag {
-  font-size: 12px; font-weight: 500;
-  color: #FF4D00;
-  background: rgba(255,77,0,0.1);
-  border: 1px solid rgba(255,77,0,0.3);
-  padding: 5px 14px; border-radius: 100px;
+  background: rgba(107,92,231,0.15); border: 1px solid rgba(107,92,231,0.3);
+  border-radius: 100px; padding: 4px 12px;
+  font-size: 12px; color: rgba(255,255,255,0.6);
 }
+.vf-project-description {
+  font-size: 18px; color: rgba(255,255,255,0.5);
+  max-width: 680px; line-height: 1.7; margin-bottom: 32px;
+}
+.vf-project-content { padding: 0 48px 80px; max-width: 1200px; margin: 0 auto; }
 
 /* \u2500\u2500 Prose \u2500\u2500 */
-.vf-prose { }
-.vf-prose h1 {
-  font-family: 'Syne', sans-serif;
-  font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2;
-  color: #FFFFFF; margin: 2.5rem 0 1rem;
+.vf-prose {
+  background: #0A0A0A; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 48px;
+  color: rgba(255,255,255,0.8); font-size: 16px;
+  line-height: 1.9; max-width: 760px; margin: 0 auto;
 }
-.vf-prose h2 {
-  font-family: 'Syne', sans-serif;
-  font-size: 26px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2;
-  color: #FFFFFF; margin: 2.5rem 0 1rem;
-}
-.vf-prose h3 {
-  font-family: 'Syne', sans-serif;
-  font-size: 20px; font-weight: 600; line-height: 1.3;
-  color: #FFFFFF; margin: 2rem 0 0.8rem;
-}
-.vf-prose h4, .vf-prose h5, .vf-prose h6 {
-  font-size: 17px; font-weight: 600;
-  color: #FFFFFF; margin: 1.5rem 0 0.6rem;
-}
-.vf-prose p {
-  font-size: 18px; line-height: 1.9; font-weight: 300;
-  color: rgba(255,255,255,0.75); margin: 1.4rem 0;
-}
-.vf-prose a { color: #FF4D00; }
-.vf-prose a:hover { text-decoration: underline; }
-.vf-prose strong { font-weight: 600; color: #FFFFFF; }
-.vf-prose em { font-style: italic; color: rgba(255,255,255,0.9); }
-.vf-prose ul { list-style: disc; padding-left: 1.5rem; margin: 1rem 0; }
-.vf-prose ol { list-style: decimal; padding-left: 1.5rem; margin: 1rem 0; }
-.vf-prose li { font-size: 18px; line-height: 1.9; font-weight: 300; color: rgba(255,255,255,0.75); margin: 0.4rem 0; }
-.vf-prose code {
-  background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9);
-  padding: 2px 7px; border-radius: 4px;
-  font-size: 0.875em; font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', monospace;
-}
-.vf-prose pre {
-  background: #111111; color: rgba(255,255,255,0.85);
-  padding: 28px; border-radius: 8px; overflow-x: auto;
-  margin: 2rem 0; border: 1px solid rgba(255,255,255,0.08);
-}
-.vf-prose pre code { background: none; padding: 0; color: inherit; }
-.vf-prose blockquote {
-  border-left: 2px solid #FF4D00;
-  padding: 4px 0 4px 24px;
-  color: rgba(255,255,255,0.45);
-  font-style: italic; margin: 1.5rem 0;
-}
-.vf-prose hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 3rem 0; }
-.vf-prose img { border-radius: 8px; margin: 0; }
-.vf-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 3rem 0; }
-.vf-gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
-.vf-gallery img { margin: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-.vf-image-single { display: flex; justify-content: center; margin: 3rem 0; }
+.vf-prose h1 { font-size: 28px; font-weight: 700; color: #fff; margin: 2rem 0 0.8rem; }
+.vf-prose h2 { font-size: 24px; font-weight: 700; color: #fff; margin: 2rem 0 0.8rem; }
+.vf-prose h3 { font-size: 20px; font-weight: 600; color: #fff; margin: 1.5rem 0 0.6rem; }
+.vf-prose h4, .vf-prose h5, .vf-prose h6 { font-size: 17px; font-weight: 600; color: #fff; margin: 1.2rem 0 0.5rem; }
+.vf-prose p { font-size: 16px; line-height: 1.9; color: rgba(255,255,255,0.8); margin: 1rem 0; }
+.vf-prose a { color: #6B5CE7; text-decoration: underline; }
+.vf-prose strong { font-weight: 600; color: #fff; }
+.vf-prose em { font-style: italic; }
+.vf-prose ul { list-style: disc; padding-left: 1.5rem; margin: 0.8rem 0; }
+.vf-prose ol { list-style: decimal; padding-left: 1.5rem; margin: 0.8rem 0; }
+.vf-prose li { font-size: 16px; line-height: 1.9; color: rgba(255,255,255,0.8); margin: 0.3rem 0; }
+.vf-prose code { background: rgba(255,255,255,0.08); padding: 2px 6px; font-size: 0.875em; border-radius: 4px; font-family: 'SF Mono', Consolas, monospace; }
+.vf-prose pre { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); padding: 24px; overflow-x: auto; margin: 1.5rem 0; border-radius: 8px; }
+.vf-prose pre code { background: none; padding: 0; }
+.vf-prose blockquote { border-left: 2px solid #6B5CE7; padding-left: 20px; color: rgba(255,255,255,0.5); font-style: italic; margin: 1.5rem 0; }
+.vf-prose hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 2rem 0; }
+.vf-prose img { width: 100%; margin: 1.5rem 0; border-radius: 8px; }
 
-/* \u2500\u2500 Nav scroll JS \u2500\u2500 */
-/* (handled inline via script) */
-
-/* \u2500\u2500 Responsive \u2500\u2500 */
+/* \u2500\u2500 Mobile \u2500\u2500 */
 @media (max-width: 768px) {
-  .vf-nav { padding: 0 24px; }
-  .vf-nav-links { display: none; }
-
-  .vf-hero-title { letter-spacing: -2px; }
-  .vf-hero-subtitle { font-size: 15px; }
-
-  .vf-projects-section { padding: 80px 24px; }
-  .vf-project-row {
-    grid-template-columns: 40px 1fr;
-    gap: 16px;
-    margin: 0 -12px;
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-  .vf-project-meta-right { display: none; }
-  .vf-project-row-cover, .vf-project-row-cover-placeholder { display: none; }
-  .vf-project-name { font-size: clamp(22px, 6vw, 36px); letter-spacing: -1px; }
-
-  .vf-about { padding: 80px 24px; }
-  .vf-about-inner { grid-template-columns: 1fr; gap: 48px; }
-  .vf-about-heading { font-size: 32px; }
-
-  .vf-footer { flex-direction: column; gap: 12px; text-align: center; padding: 40px 24px; }
-
-  .vf-back-wrap { left: 24px; top: 72px; }
-
-  .vf-project-content { padding: 60px 24px 80px; }
-  .vf-prose p, .vf-prose li { font-size: 16px; }
-}
-
-/* \u2500\u2500 View toggle (dark cinematic) \u2500\u2500 */
-.vf-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 60px; }
-.vf-section-header .vf-section-label { margin-bottom: 0; display: inline; }
-.view-toggle-container { display: flex; gap: 6px; align-items: center; }
-.view-toggle-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; background: transparent; border: 1px solid rgba(255,255,255,0.2); transition: all 0.15s ease; }
-.view-toggle-btn svg { fill: rgba(255,255,255,0.4); display: block; }
-.view-toggle-btn.active { background: #FF4D00; border-color: #FF4D00; }
-.view-toggle-btn.active svg { fill: #fff; }
-.projects-grid { transition: all 0.2s ease; }
-/* Grid view */
-#projects-container.view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
-#projects-container.view-grid .vf-project-row { display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; margin: 0; padding: 0; overflow: hidden; background: #111; }
-#projects-container.view-grid .vf-project-row:first-child { border-top: 1px solid rgba(255,255,255,0.1); }
-#projects-container.view-grid .vf-project-row-cover { width: 100%; aspect-ratio: 16/9; height: auto; border-radius: 0; flex-shrink: unset; align-self: unset; }
-#projects-container.view-grid .vf-project-row-cover-placeholder { width: 100%; height: 160px; border-radius: 0; flex-shrink: unset; align-self: unset; }
-#projects-container.view-grid .vf-project-num { display: none; }
-#projects-container.view-grid .vf-project-name { font-size: 20px; padding: 16px 16px 8px; letter-spacing: -0.5px; }
-#projects-container.view-grid .vf-project-meta-right { flex-direction: row; justify-content: flex-start; padding: 0 16px 16px; }
-#projects-container.view-grid .vf-project-year { display: none; }
-/* List view */
-#projects-container.view-list { display: flex; flex-direction: column; gap: 0; }
-#projects-container.view-list .vf-project-row { flex-direction: row; align-items: center; gap: 20px; padding: 20px 0; border-top: none; border-bottom: 1px solid rgba(255,255,255,0.08); margin: 0; background: transparent; overflow: visible; }
-#projects-container.view-list .vf-project-row:hover { background: rgba(255,255,255,0.03); padding-left: 8px; }
-#projects-container.view-list .vf-project-row-cover { width: 140px; height: 90px; flex-shrink: 0; border-radius: 8px; object-fit: cover; aspect-ratio: unset; align-self: auto; }
-#projects-container.view-list .vf-project-row-cover-placeholder { width: 140px; height: 90px; flex-shrink: 0; border-radius: 8px; background: linear-gradient(135deg, #1a1a1a, #333); }
-#projects-container.view-list .vf-project-num { display: none; }
-#projects-container.view-list .vf-project-name { font-size: 18px; font-weight: 600; padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#projects-container.view-list .vf-project-meta-right { flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; flex: 1; }
-#projects-container.view-list .vf-project-year { display: none; }
-@media (max-width: 640px) {
+  .vf-nav { padding: 14px 20px; }
+  .vf-nav-center { display: none; }
+  .vf-hero { grid-template-columns: 1fr; padding: 120px 24px 60px; gap: 24px; }
+  .vf-hero-right { align-items: flex-start; }
+  .vf-hero-slash { display: none; }
+  .vf-projects-section { padding: 60px 24px; }
+  .vf-about { padding: 60px 24px; }
+  .vf-about-text { font-size: 24px; }
+  .vf-quote { padding: 48px 24px; }
+  .vf-footer { flex-direction: column; gap: 12px; text-align: center; }
+  .vf-back-wrap { padding: 80px 24px 0; }
+  .vf-project-header { padding: 32px 24px; }
+  .vf-project-content { padding: 0 24px 60px; }
+  .vf-prose { padding: 32px 24px; }
   .view-toggle-container { display: none; }
   #projects-container.view-grid { grid-template-columns: 1fr; }
-  #projects-container.view-list .vf-project-row { flex-direction: column; }
-  #projects-container.view-list .vf-project-row-cover, #projects-container.view-list .vf-project-row-cover-placeholder { width: 100%; height: 180px; }
+  #projects-container.view-list .vf-card { flex-direction: column; }
+  #projects-container.view-list .vf-card-cover,
+  #projects-container.view-list .vf-card-cover-placeholder { width: 100%; min-width: unset; height: 180px; }
 }
 ${CALLOUT_CSS}
-`.trim();
-function htmlHead(pageTitle) {
-  return `  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${pageTitle}</title>
-  <style>${BASE_CSS}</style>`;
+
+/* \u2500\u2500 Public Properties (Dark) \u2500\u2500 */
+.vf-properties {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px; padding: 24px 0;
+  border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin: 20px 0 32px;
 }
+.vf-property-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.35); display: block; margin-bottom: 4px;
+}
+.vf-property-value { font-size: 15px; color: rgba(255,255,255,0.85); }
+.vf-property-link { font-size: 15px; color: #6B5CE7; text-decoration: none; }
+.vf-property-link:hover { color: #fff; }
+`.trim();
 function normalizeNavHref(href) {
   if (!href)
     return href;
@@ -684,40 +570,6 @@ function normalizeNavHref(href) {
   if (/^https?:\/\//.test(href) || /^mailto:/.test(href))
     return href;
   return "https://" + href;
-}
-function renderNav(siteName, root = "", navLinks = "Work: #work, About: #about") {
-  const linkItems = navLinks.split(",").map((entry) => {
-    const parts = entry.trim().split(":");
-    const label = parts[0].trim();
-    const rawHref = parts.slice(1).join(":").trim();
-    if (!label || !rawHref)
-      return "";
-    const fullHref = normalizeNavHref(rawHref);
-    const isExternal = /^https?:\/\//.test(fullHref);
-    const targetAttr = isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
-    return `<a href="${escapeHtml(fullHref)}" class="vf-nav-link"${targetAttr}>${escapeHtml(label)}</a>`;
-  }).filter(Boolean).join("\n    ");
-  return `<nav class="vf-nav" id="vf-nav">
-  <a href="${root}index.html" class="vf-nav-logo">${escapeHtml(siteName)}</a>
-  <div class="vf-nav-links">
-    ${linkItems}
-  </div>
-</nav>
-<script>
-(function(){
-  var nav = document.getElementById('vf-nav');
-  window.addEventListener('scroll', function(){
-    if(window.scrollY > 40){ nav.classList.add('scrolled'); }
-    else { nav.classList.remove('scrolled'); }
-  }, { passive: true });
-})();
-<\/script>`;
-}
-function renderFooter(siteName) {
-  return `<footer class="vf-footer">
-  <span class="vf-footer-left">${escapeHtml(siteName)}</span>
-  <span class="vf-footer-right">Built with <a href="#">VaultFolio</a></span>
-</footer>`;
 }
 function renderTagFilterScript() {
   return `<script>
@@ -779,7 +631,7 @@ function buildSite(notes, settings) {
     index = buildAppleIndex(notes, settings);
   } else if (theme === "simple") {
     pages = notes.map((note) => buildSimplePage(note, siteTitle));
-    index = buildSimpleIndex(notes, siteTitle);
+    index = buildSimpleIndex(notes, settings);
   } else if (theme === "glass") {
     pages = notes.map((note) => buildGlassPage(note, siteTitle));
     index = buildGlassIndex(notes, settings);
@@ -865,7 +717,6 @@ function renderGallerySection(images) {
   const items = images.map(
     (img) => `    <div class="vf-gallery-item">
       <img src="${img.src}" alt="${escapeHtml(img.alt)}" loading="lazy"/>
-      <span class="vf-img-caption">${escapeHtml(img.caption)}</span>
     </div>`
   ).join("\n");
   return `<section class="vf-gallery-section">
@@ -950,10 +801,9 @@ function renderGalleryCSS(theme) {
 .vf-gallery-grid .vf-gallery-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;}
 .vf-gallery-grid .vf-gallery-item:hover img{transform:scale(1.03);}
 .vf-gallery-grid .vf-img-caption{display:none;}
-.vf-gallery-list{display:flex;flex-direction:column;gap:16px;}
-.vf-gallery-list .vf-gallery-item{display:flex;flex-direction:column;gap:8px;padding-bottom:16px;border-bottom:1px solid ${c.bc};aspect-ratio:unset;border-radius:0;overflow:visible;}
-.vf-gallery-list .vf-gallery-item img{width:100%;max-height:500px;object-fit:contain;border-radius:8px;background:${c.bg};}
-.vf-gallery-list .vf-img-caption{font-size:12px;color:${c.lc};text-align:center;font-style:italic;display:block;}
+.vf-gallery-list{display:flex;flex-direction:column;gap:12px;}
+.vf-gallery-list .vf-gallery-item{aspect-ratio:unset;border-radius:0;overflow:visible;}
+.vf-gallery-list .vf-gallery-item img{width:100%;max-height:500px;object-fit:contain;border-radius:8px;background:${c.bg};display:block;}
 .vf-lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out;}
 .vf-lightbox.hidden{display:none;}
 #vf-lb-img{max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px;cursor:default;}
@@ -990,60 +840,82 @@ function buildProseWithGallery(note, proseClass) {
 }
 function buildIndex(notes, settings) {
   const siteTitle = settings.siteName;
-  const rows = notes.map((n, i) => {
-    const num = String(i + 1).padStart(2, "0");
+  const cards = notes.map((n) => {
     const title = n.displayTitle;
+    const desc = getCardDescription(n);
     const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
-    const year = extractYear(n.frontmatter.date);
-    const tagPills = tags.slice(0, 3).map((t) => `<span class="vf-project-tag-pill">${escapeHtml(t)}</span>`).join("");
+    const tagHtml = tags.slice(0, 3).map((t) => `<span class="vf-card-tag">${escapeHtml(t)}</span>`).join("");
     const coverFilename = resolveCoverFilename(n.frontmatter.cover);
-    const coverHtml = coverFilename ? `<img class="vf-project-row-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-project-row-cover-placeholder"></div>`;
-    return `<a href="pages/${n.slug}.html" class="vf-project-row vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
-  <span class="vf-project-num">${num}</span>
+    const gradient = generateGradient(title, true);
+    const coverHtml = coverFilename ? `<img class="vf-card-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-card-cover-placeholder" style="background:${gradient};display:flex;align-items:center;justify-content:center;overflow:hidden"><span style="font-size:48px;font-weight:800;color:rgba(255,255,255,0.15);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${escapeHtml(title.charAt(0).toUpperCase())}</span></div>`;
+    return `<a href="pages/${n.slug}.html" class="vf-card vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
   ${coverHtml}
-  <span class="vf-project-name">${escapeHtml(title)}</span>
-  <div class="vf-project-meta-right">
-    ${year ? `<span class="vf-project-year">${escapeHtml(year)}</span>` : ""}
-    ${tags.length > 0 ? `<div class="vf-project-tags-row">${tagPills}</div>` : ""}
+  <div class="vf-card-body">
+    <div class="vf-card-title">${escapeHtml(title)}</div>
+    ${desc ? `<div class="vf-card-desc">${escapeHtml(desc)}</div>` : ""}
+    ${tags.length > 0 ? `<div class="vf-card-tags">${tagHtml}</div>` : ""}
+    <span class="vf-card-link">Learn more \u2192</span>
   </div>
 </a>`;
   }).join("\n");
-  const allTags = collectTags(notes);
-  const defaultSkills = ["Design", "Development", "Strategy", "UX", "React", "TypeScript"];
-  const skills = allTags.length > 0 ? allTags : defaultSkills;
-  const skillChips = skills.map((s) => `<span class="vf-skill">${escapeHtml(s)}</span>`).join("");
-  const allTagsSorted = Array.from(allTags).sort();
-  const filterHtml = allTagsSorted.length > 0 ? `
-    <div class="vf-filter-bar">
-      <button class="vf-filter-btn active" data-filter="all">All</button>
-      ${allTagsSorted.map((t) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
-    </div>
-  ` : "";
-  const titleWords = escapeHtml(siteTitle).split(" ");
-  const heroTitle = titleWords.length > 1 ? titleWords.slice(0, -1).join(" ") + " <em>" + titleWords[titleWords.length - 1] + "</em>" : "<em>" + titleWords[0] + "</em>";
+  const allTags = Array.from(new Set(
+    notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags.map((t) => String(t).toLowerCase()) : [])
+  )).sort();
+  const filterHtml = allTags.length > 0 ? `
+<div class="vf-filter-bar">
+  <button class="vf-filter-btn active" data-filter="all">All</button>
+  ${allTags.map((t) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+</div>` : "";
+  const navEntries = settings.navLinks ? settings.navLinks.split(",").map((entry) => {
+    const parts = entry.trim().split(":");
+    const label = parts[0].trim();
+    const rawHref = parts.slice(1).join(":").trim();
+    if (!label || !rawHref)
+      return null;
+    const href = normalizeNavHref(rawHref);
+    return { label, href, isExternal: /^https?:\/\//.test(href) };
+  }).filter((e) => e !== null) : [];
+  const centerEntries = navEntries.length > 1 ? navEntries.slice(0, -1) : [];
+  const ctaEntry = navEntries.length > 0 ? navEntries[navEntries.length - 1] : null;
+  const navCenterHtml = centerEntries.map((e, idx) => {
+    const target = e.isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
+    const sep = idx < centerEntries.length - 1 ? `<span class="vf-nav-sep">\xB7</span>` : "";
+    return `<a href="${escapeHtml(e.href)}" class="vf-nav-center-link"${target}>${escapeHtml(e.label)}</a>${sep}`;
+  }).join("");
+  const navCtaHtml = ctaEntry ? `<a href="${escapeHtml(ctaEntry.href)}" class="vf-nav-cta"${ctaEntry.isExternal ? ` target="_blank" rel="noopener noreferrer"` : ""}>${escapeHtml(ctaEntry.label)}</a>` : `<a href="#work" class="vf-nav-cta">View Work</a>`;
+  const footerNavHtml = navEntries.map((e) => {
+    const target = e.isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
+    return `<a href="${escapeHtml(e.href)}" class="vf-footer-link"${target}>${escapeHtml(e.label)}</a>`;
+  }).join("");
+  const heroTitleText = settings.heroTitle || siteTitle;
+  const year = new Date().getFullYear();
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-${htmlHead(escapeHtml(siteTitle))}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(siteTitle)}</title>
+  <style>${BASE_CSS}</style>
 </head>
 <body>
 
-${renderNav(siteTitle, "", settings.navLinks)}
+<nav class="vf-nav">
+  <div class="vf-nav-logo">${escapeHtml(siteTitle)}</div>
+  <div class="vf-nav-center">${navCenterHtml}</div>
+  ${navCtaHtml}
+</nav>
 
-<!-- Hero -->
-<section class="vf-hero">
-  <div class="vf-hero-inner">
-    <span class="vf-hero-label">Portfolio &mdash; 2026</span>
-    <h1 class="vf-hero-title">${heroTitle}</h1>
-    <p class="vf-hero-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
+<div class="vf-hero">
+  <div class="vf-hero-left">
+    <h1 class="vf-hero-title">${escapeHtml(heroTitleText)}</h1>
+    ${settings.heroSubtitle ? `<p class="vf-hero-subtitle">${escapeHtml(settings.heroSubtitle)}</p>` : ""}
   </div>
-  <div class="vf-scroll-indicator">
-    <span>Scroll</span>
-    <div class="vf-scroll-line"></div>
+  <div class="vf-hero-right">
+    <span class="vf-hero-slash">/</span>
+    <a href="#work" class="vf-hero-work-btn">View Work \u2192</a>
   </div>
-</section>
+</div>
 
-<!-- Projects -->
 <section id="work">
   <div class="vf-projects-section">
     <div class="vf-section-header">
@@ -1052,43 +924,72 @@ ${renderNav(siteTitle, "", settings.navLinks)}
     </div>
     ${filterHtml}
     <div id="projects-container" class="projects-grid view-grid">
-      ${notes.length > 0 ? rows : `<p class="vf-no-projects">No published projects yet.</p>`}
+      ${notes.length > 0 ? cards : `<p class="vf-no-projects">No published projects yet.</p>`}
     </div>
   </div>
 </section>
 
-<!-- About -->
-<section class="vf-about" id="about">
-  <div class="vf-about-inner">
-    <div class="vf-about-left">
-      <h2 class="vf-about-heading">Building things that matter.</h2>
-      <p class="vf-about-body">${settings.aboutText}</p>
-    </div>
-    <div class="vf-about-right">
-      <div class="vf-about-detail">
-        <div class="vf-about-detail-item">
-          <div class="vf-about-detail-label">Skills</div>
-          <div class="vf-skills">${skillChips}</div>
-        </div>
-        <div class="vf-about-detail-item">
-          <div class="vf-about-detail-label">Available</div>
-          <div class="vf-about-detail-value">Open to new opportunities</div>
-        </div>
-        <div class="vf-about-detail-item">
-          <div class="vf-about-detail-label">Contact</div>
-          <div class="vf-about-detail-value"><a href="mailto:" style="color:#FF4D00">Get in touch &rarr;</a></div>
-        </div>
-      </div>
-    </div>
+${settings.aboutText ? `<section class="vf-about" id="about">
+  <p class="vf-about-text">${settings.aboutText}</p>
+</section>` : ""}
+
+${settings.quoteText ? `<section class="vf-quote">
+  <p class="vf-quote-text">${escapeHtml(settings.quoteText)}</p>
+</section>` : ""}
+
+<footer>
+  <div class="vf-footer">
+    <span class="vf-footer-copy">&copy; ${year} ${escapeHtml(siteTitle)}</span>
+    <span class="vf-footer-brand">Built with VaultFolio</span>
+    <div class="vf-footer-links">${footerNavHtml}</div>
   </div>
-</section>
+</footer>
 
-${renderFooter(siteTitle)}
-
+${allTags.length > 0 ? renderTagFilterScript() : ""}
 ${renderViewToggleScript()}
 </body>
 </html>`;
   return { path: "index.html", content: html };
+}
+function labelFromKey(key) {
+  return key.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+function isUrl(value) {
+  return value.startsWith("http://") || value.startsWith("https://") || value.startsWith("www.");
+}
+function renderPropertyValue(raw) {
+  const parts = Array.isArray(raw) ? raw.map((v) => String(v).trim()).filter(Boolean) : [raw];
+  const expanded = parts.flatMap((p) => {
+    const chunks = p.split(",").map((s) => s.trim()).filter(Boolean);
+    return chunks.length > 1 && chunks.some(isUrl) ? chunks : [p];
+  });
+  const allText = expanded.every((p) => !isUrl(p));
+  if (allText) {
+    const joined = expanded.join(", ");
+    const safe = joined.length > 200 ? joined.slice(0, 200) + "\u2026" : joined;
+    return `<span class="vf-property-value">${escapeHtml(safe)}</span>`;
+  }
+  return expanded.map((part) => {
+    const safe = part.length > 200 ? part.slice(0, 200) + "\u2026" : part;
+    if (isUrl(safe)) {
+      return `<a href="${escapeHtml(safe)}" class="vf-property-link" target="_blank" rel="noopener">View Project</a>`;
+    }
+    return `<span class="vf-property-value">${escapeHtml(safe)}</span>`;
+  }).join(" ");
+}
+function renderPublicProperties(note) {
+  const props = note.publicProperties;
+  if (!props || Object.keys(props).length === 0)
+    return "";
+  const items = Object.entries(props).map(
+    ([key, value]) => `<div class="vf-property">
+    <span class="vf-property-label">${escapeHtml(labelFromKey(key))}</span>
+    ${renderPropertyValue(value)}
+  </div>`
+  ).join("\n  ");
+  return `<div class="vf-properties">
+  ${items}
+</div>`;
 }
 function buildPage(note, siteTitle) {
   var _a;
@@ -1096,36 +997,49 @@ function buildPage(note, siteTitle) {
   const description = (_a = note.frontmatter.description) != null ? _a : "";
   const date = note.frontmatter.date;
   const tags = (Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : []).map((t) => String(t).toLowerCase());
-  const idx = Math.abs(hashString(note.slug)) % CARD_COLORS.length;
-  const heroBg = CARD_COLORS[idx];
   const tagChips = tags.map((t) => `<span class="vf-project-page-tag">${escapeHtml(String(t))}</span>`).join("");
+  const descHtml = description && !("description" in note.publicProperties) ? `<p class="vf-project-description">${escapeHtml(description)}</p>` : "";
+  const year = new Date().getFullYear();
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-${htmlHead(`${escapeHtml(title)} \u2014 ${escapeHtml(siteTitle)}`)}
-  <meta name="description" content="${escapeHtml(description)}" />
-  <style>${renderGalleryCSS("default")}</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)} \u2014 ${escapeHtml(siteTitle)}</title>
+  ${description ? `<meta name="description" content="${escapeHtml(description)}" />` : ""}
+  <style>${BASE_CSS}${renderGalleryCSS("default")}</style>
 </head>
 <body class="vf-project-page">
 
-${renderNav(siteTitle, "../")}
+<nav class="vf-nav">
+  <div class="vf-nav-logo">${escapeHtml(siteTitle)}</div>
+  <div class="vf-nav-center"></div>
+  <a href="../index.html" class="vf-nav-cta">\u2190 Back</a>
+</nav>
 
 <div class="vf-back-wrap">
-  <a href="../index.html" class="vf-back-btn">Back</a>
+  <a href="../index.html" class="vf-back-btn">\u2190 Back to work</a>
 </div>
 
-<div class="vf-project-hero-block" style="background:${heroBg}">
+<div class="vf-project-header">
   <h1 class="vf-project-hero-title">${escapeHtml(title)}</h1>
+  ${date ? `<p class="vf-project-date-line">${escapeHtml(String(date))}</p>` : ""}
+  ${tags.length > 0 ? `<div class="vf-project-tags-line">${tagChips}</div>` : ""}
+  ${descHtml}
+  ${renderPublicProperties(note)}
 </div>
 
 <div class="vf-project-content">
-  <h2 class="vf-project-content-title">${escapeHtml(title)}</h2>
-  ${date ? `<p class="vf-project-date-line">${escapeHtml(String(date))}</p>` : ""}
-  ${tags.length > 0 ? `<div class="vf-project-tags-line">${tagChips}</div>` : ""}
   ${buildProseWithGallery(note, "vf-prose")}
 </div>
 
-${renderFooter(siteTitle)}
+<footer>
+  <div class="vf-footer">
+    <span class="vf-footer-copy">&copy; ${year} ${escapeHtml(siteTitle)}</span>
+    <span class="vf-footer-brand">Built with VaultFolio</span>
+    <div class="vf-footer-links"></div>
+  </div>
+</footer>
 
 ${renderLightboxHtml()}
 ${renderGalleryScript()}
@@ -1165,27 +1079,6 @@ ${match.trim()}
     return match;
   });
   return html;
-}
-function collectTags(notes) {
-  const seen = /* @__PURE__ */ new Set();
-  for (const n of notes) {
-    const t = n.frontmatter.tags;
-    if (Array.isArray(t))
-      t.forEach((tag) => seen.add(String(tag).toLowerCase()));
-  }
-  return [...seen].sort();
-}
-function extractYear(date) {
-  if (!date)
-    return "";
-  const m = date.match(/\d{4}/);
-  return m ? m[0] : "";
-}
-function hashString(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++)
-    h = Math.imul(31, h) + s.charCodeAt(i) | 0;
-  return h;
 }
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -1316,8 +1209,11 @@ body.vf-apple {
 }
 .vf-footer-ap {
   border-top: 1px solid #d2d2d7; padding: 32px 40px; text-align: center; font-size: 12px; color: #86868b;
-  max-width: 980px; margin: 0 auto;
+  max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
+.vf-footer-ap-links { display: flex; gap: 20px; }
+.vf-footer-ap-link { color: #86868b; font-size: 12px; text-decoration: none; }
+.vf-footer-ap-link:hover { color: #1d1d1f; }
 
 /* Project Page */
 .vf-page-ap-header {
@@ -1329,6 +1225,7 @@ body.vf-apple {
 .vf-page-ap-meta {
   font-size: 17px; color: #86868b; font-weight: 400;
 }
+.vf-project-description { font-size: 19px; color: #6E6E73; line-height: 1.6; max-width: 680px; margin: 16px auto 24px; text-align: center; }
 .vf-page-ap-content {
   background: #ffffff; padding: 80px 40px; border-radius: 32px 32px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.04);
 }
@@ -1393,6 +1290,30 @@ body.vf-apple {
   #projects-container.view-list .vf-card-ap-body { padding: 12px 0 0; }
 }
 ${CALLOUT_CSS}
+
+/* \u2500\u2500 Public Properties (Apple) \u2500\u2500 */
+.vf-properties {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px; padding: 24px 0;
+  border-top: 0.5px solid #D2D2D7; border-bottom: 0.5px solid #D2D2D7;
+  margin: 20px auto 32px; max-width: 680px;
+}
+.vf-property-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+  color: #6E6E73; display: block; margin-bottom: 4px;
+}
+.vf-property-value { font-size: 15px; color: #1D1D1F; display: block; }
+.vf-property-link { font-size: 15px; color: #7C3AED; text-decoration: none; }
+.vf-property-link:hover { text-decoration: underline; }
+
+/* About (Apple) */
+.vf-about-ap {
+  max-width: 680px; margin: 0 auto; padding: 100px 40px;
+  border-top: 0.5px solid #d2d2d7;
+}
+.vf-about-ap-text {
+  font-size: 17px; color: #1d1d1f; line-height: 1.7;
+}
 `;
 function buildAppleIndex(notes, settings) {
   const siteTitle = settings.siteName;
@@ -1402,7 +1323,8 @@ function buildAppleIndex(notes, settings) {
     const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
     const tagHtml = tags.slice(0, 3).map((t) => `<span class="vf-tag-ap">${escapeHtml(t)}</span>`).join("");
     const coverFilename = resolveCoverFilename(n.frontmatter.cover);
-    const coverHtml = coverFilename ? `<img class="vf-card-ap-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-card-ap-cover-placeholder"></div>`;
+    const gradient = generateGradient(title, false);
+    const coverHtml = coverFilename ? `<img class="vf-card-ap-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="vf-card-ap-cover-placeholder" style="background:${gradient};display:flex;align-items:center;justify-content:center;overflow:hidden"><span style="font-size:64px;font-weight:800;color:rgba(255,255,255,0.25);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${escapeHtml(title.charAt(0).toUpperCase())}</span></div>`;
     return `
 <a href="pages/${n.slug}.html" class="vf-card-ap vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
   ${coverHtml}
@@ -1421,6 +1343,18 @@ function buildAppleIndex(notes, settings) {
       ${allTags.map((t) => `<button class="vf-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
     </div>
   ` : "";
+  const year = new Date().getFullYear();
+  const footerNavHtml = settings.navLinks ? settings.navLinks.split(",").map((entry) => {
+    const parts = entry.trim().split(":");
+    const label = parts[0].trim();
+    const rawHref = parts.slice(1).join(":").trim();
+    if (!label || !rawHref)
+      return "";
+    const fullHref = normalizeNavHref(rawHref);
+    const isExternal = /^https?:\/\//.test(fullHref);
+    const targetAttr = isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
+    return `<a href="${escapeHtml(fullHref)}" class="vf-footer-ap-link"${targetAttr}>${escapeHtml(label)}</a>`;
+  }).filter(Boolean).join("") : "";
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1449,8 +1383,8 @@ function buildAppleIndex(notes, settings) {
 </nav>
 
 <header class="vf-hero-ap">
-  <h1 class="vf-hero-ap-title">${escapeHtml(settings.heroTitle)}</h1>
-  <p class="vf-hero-ap-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
+  <h1 class="vf-hero-ap-title">${escapeHtml(settings.heroTitle || siteTitle)}</h1>
+  ${settings.heroSubtitle ? `<p class="vf-hero-ap-subtitle">${escapeHtml(settings.heroSubtitle)}</p>` : ""}
 </header>
 
 <section id="work" class="vf-projects-ap">
@@ -1463,13 +1397,17 @@ function buildAppleIndex(notes, settings) {
   </div>
 </section>
 
-<section class="vf-quote-ap">
+${settings.aboutText ? `<section class="vf-about-ap">
+  <p class="vf-about-ap-text">${settings.aboutText}</p>
+</section>` : ""}
+
+${settings.quoteText ? `<section class="vf-quote-ap">
   <p>${escapeHtml(settings.quoteText)}</p>
-</section>
+</section>` : ""}
 
 <footer class="vf-footer-ap">
-  Copyright &copy; 2026 ${escapeHtml(siteTitle)}. All rights reserved. <br/>
-  Published with VaultFolio.
+  <span>&copy; ${year} ${escapeHtml(siteTitle)} \u2014 Built with VaultFolio</span>
+  ${footerNavHtml ? `<div class="vf-footer-ap-links">${footerNavHtml}</div>` : ""}
 </footer>
 
 ${allTags.length > 0 ? renderTagFilterScript() : ""}
@@ -1479,8 +1417,11 @@ ${renderViewToggleScript()}
   return { path: "index.html", content: html };
 }
 function buildApplePage(note, siteTitle) {
+  var _a;
   const title = note.displayTitle;
   const date = note.frontmatter.date;
+  const description = (_a = note.frontmatter.description) != null ? _a : "";
+  const descHtml = description && !("description" in note.publicProperties) ? `<p class="vf-project-description">${escapeHtml(description)}</p>` : "";
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1498,15 +1439,17 @@ function buildApplePage(note, siteTitle) {
 
 <header class="vf-page-ap-header">
   <h1 class="vf-page-ap-title">${escapeHtml(title)}</h1>
-  <p class="vf-page-ap-meta">${date ? escapeHtml(date) : "Project Showcase"}</p>
+  ${date ? `<p class="vf-page-ap-meta">${escapeHtml(date)}</p>` : ""}
+  ${descHtml}
 </header>
 
 <main class="vf-page-ap-content">
+  ${renderPublicProperties(note)}
   ${buildProseWithGallery(note, "vf-prose-ap")}
 </main>
 
 <footer class="vf-footer-ap" style="border-top: none; padding-top: 80px;">
-  Copyright &copy; 2026 ${escapeHtml(siteTitle)}. All rights reserved.
+  &copy; ${new Date().getFullYear()} ${escapeHtml(siteTitle)} \u2014 Built with VaultFolio
 </footer>
 
 ${renderLightboxHtml()}
@@ -1566,8 +1509,9 @@ img { max-width: 100%; height: auto; display: block; }
   background: linear-gradient(135deg, #EDE9FE, #C4B5FD);
   border-bottom: 1px solid #eee;
 }
-.sp-card-body { padding: 24px; min-height: 120px; }
-.sp-card-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.sp-card-body { padding: 24px; min-height: 120px; display: flex; flex-direction: column; gap: 8px; }
+.sp-card-title { font-size: 18px; font-weight: 600; }
+.sp-card-link { font-size: 13px; color: #555; margin-top: auto; display: inline-block; }
 .sp-card-desc { font-size: 14px; color: #555; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .sp-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .sp-tag {
@@ -1597,6 +1541,7 @@ img { max-width: 100%; height: auto; display: block; }
 .sp-page-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
 .sp-page-date { font-size: 13px; color: #999; margin-bottom: 12px; }
 .sp-page-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0; }
+.vf-project-description { font-size: 16px; color: #555; line-height: 1.7; margin: 12px 0 20px; }
 .sp-page-tag {
   font-size: 12px; color: #777;
   padding: 2px 8px;
@@ -1662,24 +1607,86 @@ img { max-width: 100%; height: auto; display: block; }
   #projects-container.view-list .sp-card-cover-placeholder { width: 100%; min-width: unset; height: 160px; border-right: none; border-bottom: 1px solid #eee; }
 }
 ${CALLOUT_CSS}
+
+/* \u2500\u2500 Public Properties (Simple) \u2500\u2500 */
+.vf-properties {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px; padding: 20px 40px;
+  border-top: 1px solid #eee; border-bottom: 1px solid #eee;
+  max-width: 800px; margin: 0 auto 28px;
+}
+.vf-property-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #999; display: block; margin-bottom: 4px;
+}
+.vf-property-value { font-size: 14px; color: #1a1a1a; }
+.vf-property-link { font-size: 14px; color: #0A0A0A; text-decoration: underline; }
+
+/* Nav links */
+.sp-nav { display: flex; justify-content: space-between; align-items: center; }
+.sp-nav-links { display: flex; gap: 20px; align-items: center; }
+.sp-nav-link { font-size: 14px; color: #555; }
+.sp-nav-link:hover { color: #1a1a1a; }
+
+/* Tag filter */
+.sp-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.sp-filter-btn { font-size: 12px; padding: 4px 12px; border: 1px solid #ddd; background: none; cursor: pointer; color: #555; font-family: inherit; }
+.sp-filter-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+/* About */
+.sp-about { max-width: 800px; margin: 0 auto; padding: 60px 40px; border-top: 1px solid #eee; }
+.sp-about-text { font-size: 15px; line-height: 1.8; color: #444; }
+
+/* Quote */
+.sp-quote { max-width: 800px; margin: 0 auto; padding: 48px 40px; border-top: 1px solid #eee; }
+.sp-quote-text { font-size: 18px; font-style: italic; color: #777; line-height: 1.7; }
+
+@media (max-width: 640px) {
+  .sp-nav-links { gap: 12px; }
+  .sp-about { padding: 40px 20px; }
+  .sp-quote { padding: 32px 20px; }
+}
 `.trim();
-function buildSimpleIndex(notes, siteTitle) {
-  const cards = notes.map((n, i) => {
+function buildSimpleIndex(notes, settings) {
+  const siteTitle = settings.siteName;
+  const cards = notes.map((n) => {
     const title = n.displayTitle;
     const desc = getCardDescription(n);
     const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
     const tagHtml = tags.map((t) => `<span class="sp-tag">${escapeHtml(t)}</span>`).join("");
     const coverFilename = resolveCoverFilename(n.frontmatter.cover);
-    const coverHtml = coverFilename ? `<img class="sp-card-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="sp-card-cover-placeholder"></div>`;
-    return `<a href="pages/${n.slug}.html" class="sp-card" data-tags="${escapeHtml(tags.join(" "))}">
+    const gradient = generateGradient(title, false);
+    const coverHtml = coverFilename ? `<img class="sp-card-cover" src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" />` : `<div class="sp-card-cover-placeholder" style="background:${gradient};display:flex;align-items:center;justify-content:center;overflow:hidden"><span style="font-size:64px;font-weight:800;color:rgba(255,255,255,0.25);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${escapeHtml(title.charAt(0).toUpperCase())}</span></div>`;
+    return `<a href="pages/${n.slug}.html" class="sp-card vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
   ${coverHtml}
   <div class="sp-card-body">
     <div class="sp-card-title">${escapeHtml(title)}</div>
     ${desc ? `<div class="sp-card-desc">${escapeHtml(desc)}</div>` : ""}
     ${tags.length > 0 ? `<div class="sp-card-tags">${tagHtml}</div>` : ""}
+    <span class="sp-card-link">Learn more \u2192</span>
   </div>
 </a>`;
   }).join("\n");
+  const allTags = Array.from(new Set(
+    notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags.map((t) => String(t).toLowerCase()) : [])
+  )).sort();
+  const filterHtml = allTags.length > 0 ? `
+<div class="sp-filter-bar">
+  <button class="sp-filter-btn active" data-filter="all">All</button>
+  ${allTags.map((t) => `<button class="sp-filter-btn" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+</div>` : "";
+  const navLinkItems = settings.navLinks ? settings.navLinks.split(",").map((entry) => {
+    const parts = entry.trim().split(":");
+    const label = parts[0].trim();
+    const rawHref = parts.slice(1).join(":").trim();
+    if (!label || !rawHref)
+      return "";
+    const fullHref = normalizeNavHref(rawHref);
+    const isExternal = /^https?:\/\//.test(fullHref);
+    const targetAttr = isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
+    return `<a href="${escapeHtml(fullHref)}" class="sp-nav-link"${targetAttr}>${escapeHtml(label)}</a>`;
+  }).filter(Boolean).join("\n    ") : "";
+  const heroTitle = settings.heroTitle || siteTitle;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1692,11 +1699,12 @@ function buildSimpleIndex(notes, siteTitle) {
 
 <nav class="sp-nav">
   <a href="index.html" class="sp-nav-logo">${escapeHtml(siteTitle)}</a>
+  ${navLinkItems ? `<div class="sp-nav-links">${navLinkItems}</div>` : ""}
 </nav>
 
 <section class="sp-hero">
-  <h1>${escapeHtml(siteTitle)}</h1>
-  <p>A collection of selected work.</p>
+  <h1>${escapeHtml(heroTitle)}</h1>
+  ${settings.heroSubtitle ? `<p>${escapeHtml(settings.heroSubtitle)}</p>` : ""}
 </section>
 
 <section class="sp-section">
@@ -1704,22 +1712,35 @@ function buildSimpleIndex(notes, siteTitle) {
     <div class="sp-section-heading">Work</div>
     ${renderViewToggle()}
   </div>
+  ${filterHtml}
   ${notes.length > 0 ? `<div id="projects-container" class="sp-cards view-grid">${cards}</div>` : `<p class="sp-empty">No published projects yet.</p>`}
 </section>
 
+${settings.aboutText ? `<section class="sp-about" id="about">
+  <p class="sp-about-text">${settings.aboutText}</p>
+</section>` : ""}
+
+${settings.quoteText ? `<section class="sp-quote">
+  <p class="sp-quote-text">${escapeHtml(settings.quoteText)}</p>
+</section>` : ""}
+
 <footer class="sp-footer">
-  ${escapeHtml(siteTitle)} &mdash; Built with VaultFolio
+  &copy; ${new Date().getFullYear()} ${escapeHtml(siteTitle)} &mdash; Built with VaultFolio
 </footer>
 
+${allTags.length > 0 ? renderTagFilterScript().replace(/vf-filter-btn\b/g, "sp-filter-btn") : ""}
 ${renderViewToggleScript()}
 </body>
 </html>`;
   return { path: "index.html", content: html };
 }
 function buildSimplePage(note, siteTitle) {
+  var _a;
   const title = note.displayTitle;
   const date = note.frontmatter.date;
   const tags = (Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : []).map((t) => String(t).toLowerCase());
+  const description = (_a = note.frontmatter.description) != null ? _a : "";
+  const descHtml = description && !("description" in note.publicProperties) ? `<p class="vf-project-description">${escapeHtml(description)}</p>` : "";
   const tagHtml = tags.map((t) => `<span class="sp-page-tag">${escapeHtml(String(t))}</span>`).join("");
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1737,7 +1758,10 @@ function buildSimplePage(note, siteTitle) {
   <h1>${escapeHtml(title)}</h1>
   ${date ? `<div class="sp-page-date">${escapeHtml(String(date))}</div>` : ""}
   ${tags.length > 0 ? `<div class="sp-page-tags">${tagHtml}</div>` : ""}
+  ${descHtml}
 </div>
+
+${renderPublicProperties(note)}
 
 <div class="sp-page-content">
   ${buildProseWithGallery(note, "sp-prose")}
@@ -1971,6 +1995,7 @@ body.vf-glass {
 }
 .vf-page-gl-meta { font-size: 14px; color: rgba(255,255,255,0.4); margin-bottom: 16px; }
 .vf-page-gl-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 32px; }
+.vf-project-description { font-size: 17px; color: rgba(255,255,255,0.5); line-height: 1.6; max-width: 680px; margin: 16px auto 24px; text-align: center; }
 .vf-page-gl-content {
   background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
   border-radius: 20px; padding: 40px; margin-top: 32px;
@@ -2019,6 +2044,35 @@ body.vf-glass {
   #projects-container.view-grid { grid-template-columns: 1fr; }
 }
 ${CALLOUT_CSS}
+
+/* \u2500\u2500 Public Properties (Glass) \u2500\u2500 */
+.vf-properties {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px; padding: 24px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px; margin: 20px 0 32px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.vf-property-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.35); display: block; margin-bottom: 4px;
+}
+.vf-property-value { font-size: 15px; color: rgba(255,255,255,0.85); }
+.vf-property-link { font-size: 15px; color: #A78BFA; text-decoration: none; }
+.vf-property-link:hover { color: #fff; }
+
+/* Quote (Glass) */
+.vf-quote-gl {
+  max-width: 760px; margin: 0 auto 60px; padding: 48px 32px;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 24px;
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.vf-quote-gl-text {
+  font-size: 20px; font-style: italic; font-weight: 300;
+  color: rgba(255,255,255,0.45); line-height: 1.7;
+}
 `;
 function buildGlassIndex(notes, settings) {
   const siteTitle = settings.siteName;
@@ -2026,9 +2080,10 @@ function buildGlassIndex(notes, settings) {
     const title = n.displayTitle;
     const desc = getCardDescription(n);
     const tags = (Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : []).map((t) => String(t).toLowerCase());
-    const tagHtml = tags.slice(0, 3).map((t) => `<span class="glass-tag">${escapeHtml(t)}</span>`).join("");
+    const tagHtml = tags.map((t) => `<span class="glass-tag">${escapeHtml(t)}</span>`).join("");
     const coverFilename = resolveCoverFilename(n.frontmatter.cover);
-    const coverHtml = coverFilename ? `<div class="glass-card-cover"><img src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" /></div>` : `<div class="glass-card-cover-placeholder"></div>`;
+    const gradient = generateGradient(title, true);
+    const coverHtml = coverFilename ? `<div class="glass-card-cover"><img src="images/${encodeURIComponent(coverFilename)}" alt="${escapeHtml(title)}" /></div>` : `<div class="glass-card-cover-placeholder" style="background:${gradient};overflow:hidden"><span style="font-size:64px;font-weight:800;color:rgba(255,255,255,0.25);user-select:none;line-height:1;font-family:-apple-system,sans-serif">${escapeHtml(title.charAt(0).toUpperCase())}</span></div>`;
     return `
 <a href="pages/${n.slug}.html" class="glass-card vf-filter-card" data-tags="${escapeHtml(tags.join(" "))}">
   ${coverHtml}
@@ -2059,9 +2114,6 @@ function buildGlassIndex(notes, settings) {
     const targetAttr = isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
     return `<a href="${escapeHtml(fullHref)}" class="vf-nav-gl-link"${targetAttr}>${escapeHtml(label)}</a>`;
   }).filter(Boolean).join("\n    ");
-  const uniqueTagCount = new Set(
-    notes.flatMap((n) => Array.isArray(n.frontmatter.tags) ? n.frontmatter.tags : [])
-  ).size;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2073,7 +2125,7 @@ function buildGlassIndex(notes, settings) {
 <body class="vf-glass">
 
 <nav class="vf-nav-gl">
-  <div class="vf-nav-gl-logo">VAULT<span>FOLIO</span></div>
+  <div class="vf-nav-gl-logo">${escapeHtml(siteTitle)}</div>
   <div class="vf-nav-gl-links">
     ${navLinks}
   </div>
@@ -2084,28 +2136,13 @@ function buildGlassIndex(notes, settings) {
     <span class="vf-hero-gl-badge-dot"></span>
     Portfolio \u2014 ${new Date().getFullYear()}
   </div>
-  <h1 class="vf-hero-gl-title">${escapeHtml(settings.heroTitle)}</h1>
-  <p class="vf-hero-gl-subtitle">${escapeHtml(settings.heroSubtitle)}</p>
+  <h1 class="vf-hero-gl-title">${escapeHtml(settings.heroTitle || siteTitle)}</h1>
+  ${settings.heroSubtitle ? `<p class="vf-hero-gl-subtitle">${escapeHtml(settings.heroSubtitle)}</p>` : ""}
   <div class="vf-hero-gl-cta-row">
     <button class="vf-hero-gl-btn-primary" onclick="document.getElementById('work').scrollIntoView({behavior:'smooth'})">View Work</button>
-    <button class="vf-hero-gl-btn-secondary" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">About Me</button>
+    ${settings.aboutText ? `<button class="vf-hero-gl-btn-secondary" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">About Me</button>` : ""}
   </div>
 </header>
-
-<div class="vf-stats-gl">
-  <div class="vf-stat-gl">
-    <span class="vf-stat-gl-num">${notes.length}</span>
-    <span class="vf-stat-gl-lbl">Projects</span>
-  </div>
-  <div class="vf-stat-gl">
-    <span class="vf-stat-gl-num">${new Date().getFullYear()}</span>
-    <span class="vf-stat-gl-lbl">Active</span>
-  </div>
-  <div class="vf-stat-gl">
-    <span class="vf-stat-gl-num">${uniqueTagCount}</span>
-    <span class="vf-stat-gl-lbl">Skills</span>
-  </div>
-</div>
 
 <section id="work" class="vf-projects-gl">
   <div class="vf-section-header-gl">
@@ -2118,18 +2155,16 @@ function buildGlassIndex(notes, settings) {
   </div>
 </section>
 
-<section id="about" class="vf-about-gl">
+${settings.aboutText ? `<section id="about" class="vf-about-gl">
   <div>
     <div class="vf-about-gl-heading">About</div>
     <div class="vf-about-gl-text">${escapeHtml(settings.aboutText)}</div>
   </div>
-  <div>
-    <div class="vf-about-gl-text">${escapeHtml(settings.quoteText)}</div>
-    <div class="vf-skills-gl">
-      ${allTags.slice(0, 8).map((s) => `<span class="vf-skill-gl">${escapeHtml(s)}</span>`).join("")}
-    </div>
-  </div>
-</section>
+</section>` : ""}
+
+${settings.quoteText ? `<div class="vf-quote-gl">
+  <p class="vf-quote-gl-text">${escapeHtml(settings.quoteText)}</p>
+</div>` : ""}
 
 <footer class="vf-footer-gl">
   <span>\xA9 ${new Date().getFullYear()} ${escapeHtml(siteTitle)}</span>
@@ -2144,9 +2179,12 @@ ${renderViewToggleScript()}
   return { path: "index.html", content: html };
 }
 function buildGlassPage(note, siteTitle) {
+  var _a;
   const title = note.displayTitle;
   const date = note.frontmatter.date;
   const tags = (Array.isArray(note.frontmatter.tags) ? note.frontmatter.tags : []).map((t) => String(t).toLowerCase());
+  const description = (_a = note.frontmatter.description) != null ? _a : "";
+  const descHtml = description && !("description" in note.publicProperties) ? `<p class="vf-project-description">${escapeHtml(description)}</p>` : "";
   const tagHtml = tags.map((t) => `<span class="glass-tag">${escapeHtml(t)}</span>`).join("");
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -2164,6 +2202,8 @@ function buildGlassPage(note, siteTitle) {
   <h1 class="vf-page-gl-title">${escapeHtml(title)}</h1>
   ${date ? `<div class="vf-page-gl-meta">${escapeHtml(String(date))}</div>` : ""}
   ${tags.length > 0 ? `<div class="vf-page-gl-tags">${tagHtml}</div>` : ""}
+  ${descHtml}
+  ${renderPublicProperties(note)}
 
   <div class="vf-page-gl-content">
     ${buildProseWithGallery(note, "vf-prose-gl")}
@@ -2178,6 +2218,7 @@ ${renderGalleryScript()}
 }
 
 // src/deployer.ts
+var import_obsidian = require("obsidian");
 async function deploySite(files, config, images) {
   var _a, _b;
   if (!config.githubToken) {
@@ -2243,9 +2284,9 @@ async function deploySite(files, config, images) {
   }
 }
 async function getOrCreateBranch(owner, repo, branch, token) {
-  const refRes = await ghFetch("GET", `/repos/${owner}/${repo}/git/refs/heads/${branch}`, token);
-  if (refRes.ok) {
-    const ref = await refRes.json();
+  const refRes = await ghRequest("GET", `/repos/${owner}/${repo}/git/refs/heads/${branch}`, token);
+  if (ok(refRes)) {
+    const ref = refRes.json;
     const commitSha = ref.object.sha;
     const commit2 = await ghJson(
       "GET",
@@ -2255,15 +2296,15 @@ async function getOrCreateBranch(owner, repo, branch, token) {
     return { commitSha, treeSha: commit2.tree.sha };
   }
   if (refRes.status !== 404) {
-    throw await buildApiError(refRes, "checking branch");
+    throw buildApiError(refRes, "checking branch");
   }
   const baseSha = await findDefaultBranchSha(owner, repo, token);
-  const createRes = await ghFetch("POST", `/repos/${owner}/${repo}/git/refs`, token, {
+  const createRes = await ghRequest("POST", `/repos/${owner}/${repo}/git/refs`, token, {
     ref: `refs/heads/${branch}`,
     sha: baseSha
   });
-  if (!createRes.ok)
-    throw await buildApiError(createRes, "creating branch");
+  if (!ok(createRes))
+    throw buildApiError(createRes, "creating branch");
   const commit = await ghJson(
     "GET",
     `/repos/${owner}/${repo}/git/commits/${baseSha}`,
@@ -2273,9 +2314,9 @@ async function getOrCreateBranch(owner, repo, branch, token) {
 }
 async function findDefaultBranchSha(owner, repo, token) {
   for (const name of ["main", "master"]) {
-    const res = await ghFetch("GET", `/repos/${owner}/${repo}/git/refs/heads/${name}`, token);
-    if (res.ok) {
-      const data = await res.json();
+    const res = await ghRequest("GET", `/repos/${owner}/${repo}/git/refs/heads/${name}`, token);
+    if (ok(res)) {
+      const data = res.json;
       return data.object.sha;
     }
   }
@@ -2311,24 +2352,24 @@ async function createCommit(owner, repo, message, treeSha, parentSha, token) {
   return data.sha;
 }
 async function updateRef(owner, repo, branch, commitSha, token) {
-  const res = await ghFetch(
+  const res = await ghRequest(
     "PATCH",
     `/repos/${owner}/${repo}/git/refs/heads/${branch}`,
     token,
     { sha: commitSha, force: true }
   );
-  if (!res.ok)
-    throw await buildApiError(res, "updating branch ref");
+  if (!ok(res))
+    throw buildApiError(res, "updating branch ref");
 }
 async function fetchExistingPaths(owner, repo, treeSha, token) {
-  const res = await ghFetch(
+  const res = await ghRequest(
     "GET",
     `/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`,
     token
   );
-  if (!res.ok)
+  if (!ok(res))
     return [];
-  const data = await res.json();
+  const data = res.json;
   return data.tree.filter((item) => item.type === "blob").map((item) => item.path);
 }
 function findStalePaths(existingPaths, newPaths) {
@@ -2336,8 +2377,12 @@ function findStalePaths(existingPaths, newPaths) {
     (p) => (p.endsWith(".html") || p.startsWith("images/")) && !newPaths.has(p)
   );
 }
-function ghFetch(method, path, token, body) {
-  return fetch(`https://api.github.com${path}`, {
+function ok(res) {
+  return res.status >= 200 && res.status < 300;
+}
+function ghRequest(method, path, token, body) {
+  return (0, import_obsidian.requestUrl)({
+    url: `https://api.github.com${path}`,
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -2345,20 +2390,21 @@ function ghFetch(method, path, token, body) {
       "Content-Type": "application/json",
       "X-GitHub-Api-Version": "2022-11-28"
     },
-    body: body !== void 0 ? JSON.stringify(body) : void 0
+    body: body !== void 0 ? JSON.stringify(body) : void 0,
+    throw: false
   });
 }
 async function ghJson(method, path, token, body) {
-  const res = await ghFetch(method, path, token, body);
-  if (!res.ok)
-    throw await buildApiError(res, `${method} ${path}`);
-  return res.json();
+  const res = await ghRequest(method, path, token, body);
+  if (!ok(res))
+    throw buildApiError(res, `${method} ${path}`);
+  return res.json;
 }
-async function buildApiError(res, context) {
-  let detail = res.statusText;
+function buildApiError(res, context) {
+  let detail = String(res.status);
   try {
-    const body = await res.json();
-    if (body.message)
+    const body = res.json;
+    if (body == null ? void 0 : body.message)
       detail = body.message;
   } catch (e) {
   }
@@ -2374,10 +2420,114 @@ async function buildApiError(res, context) {
 }
 
 // src/ui/settingsTab.ts
-var import_obsidian = require("obsidian");
-var VaultFolioSettingsTab = class extends import_obsidian.PluginSettingTab {
+var import_obsidian3 = require("obsidian");
+
+// src/github-auth.ts
+var import_obsidian2 = require("obsidian");
+var GITHUB_CLIENT_ID = "Ov23liNeQynCCQUQ8G7e";
+async function requestDeviceCode() {
+  try {
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: "https://github.com/login/device/code",
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ client_id: GITHUB_CLIENT_ID, scope: "repo" })
+    });
+    return response.json;
+  } catch (e) {
+    throw new Error("Failed to get device code from GitHub");
+  }
+}
+async function pollForToken(deviceCode, interval, onStatusUpdate, signal) {
+  return new Promise((resolve, reject) => {
+    let currentInterval = interval * 1e3;
+    let attempts = 0;
+    const maxAttempts = 180;
+    let timeoutId;
+    const poll = async () => {
+      if (signal.cancelled) {
+        reject(new Error("cancelled"));
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        reject(new Error("Authorization timed out"));
+        return;
+      }
+      attempts++;
+      try {
+        const response = await (0, import_obsidian2.requestUrl)({
+          url: "https://github.com/login/oauth/access_token",
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            client_id: GITHUB_CLIENT_ID,
+            device_code: deviceCode,
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+          })
+        });
+        if (signal.cancelled) {
+          reject(new Error("cancelled"));
+          return;
+        }
+        const data = response.json;
+        if (data.access_token) {
+          resolve(data.access_token);
+          return;
+        }
+        if (data.error === "slow_down" && data.interval) {
+          currentInterval = data.interval * 1e3;
+          onStatusUpdate("Waiting for authorization...");
+        } else if (data.error === "authorization_pending") {
+          onStatusUpdate("Waiting for authorization...");
+        } else if (data.error === "expired_token") {
+          reject(new Error("Authorization code expired. Please try again."));
+          return;
+        } else if (data.error === "access_denied") {
+          reject(new Error("Authorization was denied."));
+          return;
+        }
+        timeoutId = setTimeout(poll, currentInterval);
+      } catch (e) {
+        if (signal.cancelled) {
+          reject(new Error("cancelled"));
+          return;
+        }
+        onStatusUpdate("Retrying...");
+        timeoutId = setTimeout(poll, currentInterval);
+      }
+    };
+    timeoutId = setTimeout(poll, currentInterval);
+  });
+}
+async function getGitHubUsername(token) {
+  var _a;
+  try {
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: "https://api.github.com/user",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json"
+      }
+    });
+    return (_a = response.json.login) != null ? _a : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// src/ui/settingsTab.ts
+var VaultFolioSettingsTab = class extends import_obsidian3.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
+    this.pollSignal = null;
+    this.githubAuthContainer = null;
+    this.connectingStatusEl = null;
     this.plugin = plugin;
   }
   display() {
@@ -2385,25 +2535,31 @@ var VaultFolioSettingsTab = class extends import_obsidian.PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "VaultFolio Settings" });
     containerEl.createEl("h3", { text: "Site" });
-    new import_obsidian.Setting(containerEl).setName("Site name").setDesc("Displayed as your portfolio heading.").addText(
+    new import_obsidian3.Setting(containerEl).setName("Site name").setDesc("Displayed as your portfolio heading.").addText(
       (text) => text.setPlaceholder("My Portfolio").setValue(this.plugin.settings.siteName).onChange(async (value) => {
         this.plugin.settings.siteName = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Portfolio folder").setDesc("Folder in your vault containing notes to publish.").addText(
+    new import_obsidian3.Setting(containerEl).setName("Portfolio folder").setDesc("Folder in your vault containing notes to publish.").addText(
       (text) => text.setPlaceholder("portfolio").setValue(this.plugin.settings.portfolioFolder).onChange(async (value) => {
         this.plugin.settings.portfolioFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Output folder").setDesc("Local folder where HTML files are written.").addText(
+    new import_obsidian3.Setting(containerEl).setName("Output folder").setDesc("Local folder where HTML files are written.").addText(
       (text) => text.setPlaceholder("_site").setValue(this.plugin.settings.outputFolder).onChange(async (value) => {
         this.plugin.settings.outputFolder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Theme").setDesc("Visual style for your generated site.").addDropdown(
+    new import_obsidian3.Setting(containerEl).setName("Cover image property").setDesc("Frontmatter property name that holds the cover image (default: cover).").addText(
+      (text) => text.setPlaceholder("cover").setValue(this.plugin.settings.coverProperty).onChange(async (value) => {
+        this.plugin.settings.coverProperty = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian3.Setting(containerEl).setName("Theme").setDesc("Visual style for your generated site.").addDropdown(
       (drop) => drop.addOption("default", "Dark Cinematic (Default)").addOption("apple", "Apple Minimalist").addOption("simple", "Simple").addOption("glass", "Glassmorphism").setValue(this.plugin.settings.theme).onChange(async (value) => {
         this.plugin.settings.theme = value;
         await this.plugin.saveSettings();
@@ -2416,58 +2572,50 @@ var VaultFolioSettingsTab = class extends import_obsidian.PluginSettingTab {
       window.open("https://thedozcompany.github.io/vaultfolio-portfolio/theme-preview.html", "_blank");
     });
     containerEl.createEl("h3", { text: "Site Content" });
-    new import_obsidian.Setting(containerEl).setName("Nav Menu Links").setDesc("Format: 'Label: URL, Label: URL' (e.g. 'Work: #work, About: #about')").addTextArea(
+    new import_obsidian3.Setting(containerEl).setName("Nav Menu Links").setDesc("Format: 'Label: URL, Label: URL' (e.g. 'Work: #work, About: #about')").addTextArea(
       (text) => text.setPlaceholder("Work: #work, GitHub: https://github.com/...").setValue(this.plugin.settings.navLinks).onChange(async (value) => {
         this.plugin.settings.navLinks = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Hero Title").setDesc("The main large text on the homepage.").addText(
+    new import_obsidian3.Setting(containerEl).setName("Hero Title").setDesc("The main large text on the homepage.").addText(
       (text) => text.setPlaceholder("Pro. Beyond.").setValue(this.plugin.settings.heroTitle).onChange(async (value) => {
         this.plugin.settings.heroTitle = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Hero Subtitle").setDesc("The text below the main hero title.").addTextArea(
+    new import_obsidian3.Setting(containerEl).setName("Hero Subtitle").setDesc("The text below the main hero title.").addTextArea(
       (text) => text.setPlaceholder("Welcome to my digital portfolio.").setValue(this.plugin.settings.heroSubtitle).onChange(async (value) => {
         this.plugin.settings.heroSubtitle = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("About Text").setDesc("Text shown in the About section (HTML supported).").addTextArea(
+    new import_obsidian3.Setting(containerEl).setName("About Text").setDesc("Text shown in the About section (HTML supported).").addTextArea(
       (text) => text.setPlaceholder("I'm a designer and developer...").setValue(this.plugin.settings.aboutText).onChange(async (value) => {
         this.plugin.settings.aboutText = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Quote Text").setDesc("Quote displayed above the footer.").addTextArea(
+    new import_obsidian3.Setting(containerEl).setName("Quote Text").setDesc("Quote displayed above the footer.").addTextArea(
       (text) => text.setPlaceholder('"The details are not the details. They make the design."').setValue(this.plugin.settings.quoteText).onChange(async (value) => {
         this.plugin.settings.quoteText = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "GitHub Deploy" });
-    new import_obsidian.Setting(containerEl).setName("GitHub repository").setDesc("Format: username/repository-name").addText(
+    new import_obsidian3.Setting(containerEl).setName("GitHub repository").setDesc("Format: username/repository-name").addText(
       (text) => text.setPlaceholder("owner/repo").setValue(this.plugin.settings.githubRepo).onChange(async (value) => {
         this.plugin.settings.githubRepo = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("GitHub token").setDesc("Classic token with repo scope. Never shared outside your machine.").addText((text) => {
-      text.setPlaceholder("ghp_...").setValue(this.plugin.settings.githubToken).onChange(async (value) => {
-        this.plugin.settings.githubToken = value;
-        await this.plugin.saveSettings();
-      });
-      text.inputEl.type = "password";
-    });
-    const tokenWarning = containerEl.createEl("p", {
-      text: "\u26A0\uFE0F Use a classic token with repo scope only. Fine-grained tokens are not supported."
-    });
-    tokenWarning.style.cssText = "color: #FF4D00; font-size: 0.8rem; margin: -0.5rem 0 1.5rem 0; padding: 0 1rem; line-height: 1.5;";
+    this.githubAuthContainer = containerEl.createDiv();
+    this.githubAuthContainer.style.cssText = "padding: 0 1rem; margin-bottom: 1rem;";
+    this.renderGitHubAuth();
     const saveSeparator = containerEl.createDiv();
     saveSeparator.style.cssText = "border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px; margin-top: 20px;";
     const saveBtn = saveSeparator.createEl("button", { text: "Save Settings" });
-    saveBtn.style.cssText = "background: #7C3AED; color: white; border: 1px solid #5B21B6; border-radius: 6px; padding: 10px 5px; font-size: 13px; font-weight: 500; cursor: pointer;  display: flex;  letter-spacing: 0.02em; transition: background 0.15s ease;";
+    saveBtn.style.cssText = "background: #7C3AED; color: white; border: 1px solid #5B21B6; border-radius: 6px; padding: 10px 5px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; letter-spacing: 0.02em; transition: background 0.15s ease;";
     saveBtn.addEventListener("mouseenter", () => {
       saveBtn.style.background = "#5B21B6";
     });
@@ -2476,15 +2624,159 @@ var VaultFolioSettingsTab = class extends import_obsidian.PluginSettingTab {
     });
     saveBtn.addEventListener("click", async () => {
       await this.plugin.saveSettings();
-      new import_obsidian.Notice("\u2705 Settings saved.");
+      new import_obsidian3.Notice("\u2705 Settings saved.");
     });
+  }
+  // ── Auth state rendering ───────────────────────────────────────────────────
+  renderGitHubAuth() {
+    if (!this.githubAuthContainer)
+      return;
+    this.githubAuthContainer.empty();
+    this.connectingStatusEl = null;
+    if (this.plugin.settings.githubToken) {
+      this.renderConnected();
+    } else {
+      this.renderNotConnected();
+    }
+  }
+  renderNotConnected() {
+    const c = this.githubAuthContainer;
+    const connectBtn = c.createEl("button", { text: "Connect GitHub" });
+    connectBtn.style.cssText = "background: #7C3AED; color: white; border: none; border-radius: 8px; padding: 10px 20px; width: 100%; font-size: 14px; cursor: pointer; margin-bottom: 8px; transition: background 0.15s ease;";
+    connectBtn.addEventListener("mouseenter", () => {
+      connectBtn.style.background = "#5B21B6";
+    });
+    connectBtn.addEventListener("mouseleave", () => {
+      connectBtn.style.background = "#7C3AED";
+    });
+    connectBtn.addEventListener("click", () => {
+      void this.startDeviceFlow();
+    });
+    const hint = c.createEl("p", {
+      text: "Securely connect via GitHub OAuth. No personal access token needed."
+    });
+    hint.style.cssText = "color: var(--text-muted); font-size: 12px; margin: 0;";
+  }
+  renderConnecting(deviceData) {
+    const c = this.githubAuthContainer;
+    c.empty();
+    this.connectingStatusEl = null;
+    const card = c.createDiv();
+    card.style.cssText = "border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 16px; background: var(--background-secondary);";
+    const step1Label = card.createEl("p", { text: "1. Visit this URL in your browser" });
+    step1Label.style.cssText = "font-size: 12px; font-weight: 600; margin: 0 0 4px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;";
+    const link = card.createEl("a", {
+      text: deviceData.verification_uri,
+      href: deviceData.verification_uri
+    });
+    link.style.cssText = "color: #7C3AED; font-size: 13px; display: block; margin-bottom: 14px; word-break: break-all;";
+    link.setAttribute("target", "_blank");
+    link.setAttribute("rel", "noopener");
+    const step2Label = card.createEl("p", { text: "2. Enter this code" });
+    step2Label.style.cssText = "font-size: 12px; font-weight: 600; margin: 0 0 4px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;";
+    const codeEl = card.createEl("div", { text: deviceData.user_code });
+    codeEl.style.cssText = "font-family: monospace; font-size: 24px; font-weight: 700; letter-spacing: 0.2em;color: #7C3AED; text-align: center; padding: 12px;background: var(--background-modifier-hover); border-radius: 6px; margin: 8px 0 14px;";
+    const statusEl = card.createEl("p", { text: "Waiting for authorization..." });
+    statusEl.style.cssText = "font-size: 12px; color: var(--text-muted); margin: 0 0 10px;";
+    this.connectingStatusEl = statusEl;
+    const cancelBtn = card.createEl("button", { text: "Cancel" });
+    cancelBtn.style.cssText = "background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; padding: 0; text-decoration: underline;";
+    cancelBtn.addEventListener("click", () => {
+      if (this.pollSignal) {
+        this.pollSignal.cancelled = true;
+        this.pollSignal = null;
+      }
+      this.renderGitHubAuth();
+    });
+  }
+  renderConnected() {
+    const c = this.githubAuthContainer;
+    const wrapper = c.createDiv();
+    wrapper.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 12px;padding: 12px 16px; border: 1px solid var(--background-modifier-border);border-radius: 8px; background: var(--background-secondary);";
+    const left = wrapper.createDiv();
+    const checkLine = left.createEl("p");
+    checkLine.style.cssText = "display: flex; align-items: center; gap: 6px; margin: 0 0 2px; font-size: 14px; font-weight: 500; color: var(--text-normal);";
+    const checkMark = checkLine.createEl("span", { text: "\u2713" });
+    checkMark.style.cssText = "color: #22c55e; font-weight: 700;";
+    checkLine.createEl("span", { text: "Connected to GitHub" });
+    const username = this.plugin.settings.githubUsername;
+    if (username) {
+      const sub = left.createEl("p", { text: `Authorized as @${username}` });
+      sub.style.cssText = "margin: 0; font-size: 12px; color: var(--text-muted);";
+    }
+    const disconnectBtn = wrapper.createEl("button", { text: "Disconnect" });
+    disconnectBtn.style.cssText = "background: none; border: none; color: var(--text-muted); font-size: 12px;cursor: pointer; text-decoration: underline; flex-shrink: 0;";
+    disconnectBtn.addEventListener("click", async () => {
+      this.plugin.settings.githubToken = "";
+      this.plugin.settings.githubUsername = "";
+      await this.plugin.saveSettings();
+      new import_obsidian3.Notice(
+        "Disconnected from GitHub. To fully revoke access, visit GitHub \u2192 Settings \u2192 Applications \u2192 Authorized OAuth Apps."
+      );
+      this.renderGitHubAuth();
+    });
+  }
+  // ── Device flow orchestration ──────────────────────────────────────────────
+  async startDeviceFlow() {
+    var _a, _b;
+    let deviceData;
+    try {
+      deviceData = await requestDeviceCode();
+    } catch (e) {
+      new import_obsidian3.Notice("Unable to connect to GitHub. Check your internet connection.");
+      return;
+    }
+    window.open(deviceData.verification_uri, "_blank");
+    this.renderConnecting(deviceData);
+    const signal = { cancelled: false };
+    this.pollSignal = signal;
+    try {
+      const token = await pollForToken(
+        deviceData.device_code,
+        deviceData.interval,
+        (status) => this.updateConnectingStatus(status),
+        signal
+      );
+      if (signal.cancelled)
+        return;
+      this.plugin.settings.githubToken = token;
+      await this.plugin.saveSettings();
+      const username = await getGitHubUsername(token);
+      this.plugin.settings.githubUsername = username;
+      await this.plugin.saveSettings();
+      new import_obsidian3.Notice("\u2705 Connected to GitHub!");
+      if ((_a = this.githubAuthContainer) == null ? void 0 : _a.isConnected) {
+        this.renderGitHubAuth();
+      }
+    } catch (err) {
+      if (signal.cancelled || err instanceof Error && err.message === "cancelled")
+        return;
+      const msg = err instanceof Error ? err.message : "Authorization failed. Please try again.";
+      new import_obsidian3.Notice(msg);
+      this.updateConnectingStatus(msg);
+      if ((_b = this.githubAuthContainer) == null ? void 0 : _b.isConnected) {
+        setTimeout(() => {
+          var _a2;
+          if ((_a2 = this.githubAuthContainer) == null ? void 0 : _a2.isConnected)
+            this.renderGitHubAuth();
+        }, 3e3);
+      }
+    } finally {
+      if (this.pollSignal === signal)
+        this.pollSignal = null;
+    }
+  }
+  updateConnectingStatus(status) {
+    if (this.connectingStatusEl) {
+      this.connectingStatusEl.textContent = status;
+    }
   }
 };
 
 // src/ui/sidebarView.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 var SIDEBAR_VIEW_TYPE = "vaultfolio-sidebar";
-var VaultFolioSidebarView = class extends import_obsidian2.ItemView {
+var VaultFolioSidebarView = class extends import_obsidian4.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.notes = [];
@@ -2514,7 +2806,7 @@ var VaultFolioSidebarView = class extends import_obsidian2.ItemView {
     this.isLoading = false;
     this.render();
     if (notify) {
-      new import_obsidian2.Notice(`Refreshed. ${this.notes.length} note${this.notes.length === 1 ? "" : "s"} found.`);
+      new import_obsidian4.Notice(`Refreshed. ${this.notes.length} note${this.notes.length === 1 ? "" : "s"} found.`);
     }
   }
   // ── Render ────────────────────────────────────────────────────────────────
@@ -2603,11 +2895,11 @@ var VaultFolioSidebarView = class extends import_obsidian2.ItemView {
       buildBtn.setText("Building\u2026");
       try {
         const result = await this.plugin.buildSite();
-        new import_obsidian2.Notice(
+        new import_obsidian4.Notice(
           `\u2705 Site built successfully \u2014 ${result.pageCount} page${result.pageCount === 1 ? "" : "s"} generated`
         );
       } catch (err) {
-        new import_obsidian2.Notice(
+        new import_obsidian4.Notice(
           `\u274C Build failed \u2014 ${err instanceof Error ? err.message : "check your portfolio folder"}`
         );
       } finally {
@@ -2626,23 +2918,23 @@ var VaultFolioSidebarView = class extends import_obsidian2.ItemView {
         deployBtn.setText("Deploying\u2026");
         const result = await this.plugin.deployFiles(buildResult.files, buildResult.imageMap);
         if (result.success) {
-          new import_obsidian2.Notice(`\u{1F680} Deployed! Visit: ${(_a = result.url) != null ? _a : result.message}`);
+          new import_obsidian4.Notice(`\u{1F680} Deployed! Visit: ${(_a = result.url) != null ? _a : result.message}`);
         } else {
           const msg = result.message;
           if (msg.includes("Invalid GitHub token") || msg.includes("401")) {
-            new import_obsidian2.Notice("\u274C Invalid GitHub token \u2014 regenerate in GitHub settings");
+            new import_obsidian4.Notice("\u274C Invalid GitHub token \u2014 regenerate in GitHub settings");
           } else {
-            new import_obsidian2.Notice("\u274C Deploy failed \u2014 check your GitHub token and repo");
+            new import_obsidian4.Notice("\u274C Deploy failed \u2014 check your GitHub token and repo");
           }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network")) {
-          new import_obsidian2.Notice("\u274C Network error \u2014 check your connection");
+          new import_obsidian4.Notice("\u274C Network error \u2014 check your connection");
         } else if (msg.includes("token") || msg.includes("401")) {
-          new import_obsidian2.Notice("\u274C Invalid GitHub token \u2014 regenerate in GitHub settings");
+          new import_obsidian4.Notice("\u274C Invalid GitHub token \u2014 regenerate in GitHub settings");
         } else {
-          new import_obsidian2.Notice(`\u274C Deploy failed \u2014 ${msg}`);
+          new import_obsidian4.Notice(`\u274C Deploy failed \u2014 ${msg}`);
         }
       } finally {
         buildBtn.disabled = false;
@@ -2654,7 +2946,7 @@ var VaultFolioSidebarView = class extends import_obsidian2.ItemView {
 };
 
 // src/main.ts
-var VaultFolioPlugin = class extends import_obsidian3.Plugin {
+var VaultFolioPlugin = class extends import_obsidian5.Plugin {
   async onload() {
     console.log("VaultFolio loaded");
     await this.loadSettings();
@@ -2664,7 +2956,7 @@ var VaultFolioPlugin = class extends import_obsidian3.Plugin {
       (leaf) => new VaultFolioSidebarView(leaf, this)
     );
     this.addRibbonIcon("layout", "VaultFolio", () => {
-      new import_obsidian3.Notice("VaultFolio is ready");
+      new import_obsidian5.Notice("VaultFolio is ready");
       this.activateSidebar();
     });
     this.addSettingTab(new VaultFolioSettingsTab(this.app, this));
@@ -2679,11 +2971,11 @@ var VaultFolioPlugin = class extends import_obsidian3.Plugin {
       callback: async () => {
         try {
           const result = await this.buildSite();
-          new import_obsidian3.Notice(
+          new import_obsidian5.Notice(
             `\u2705 Site built successfully \u2014 ${result.pageCount} page${result.pageCount === 1 ? "" : "s"} generated`
           );
         } catch (err) {
-          new import_obsidian3.Notice(
+          new import_obsidian5.Notice(
             `\u274C Build failed \u2014 ${err instanceof Error ? err.message : "check your portfolio folder"}`
           );
         }
@@ -2697,28 +2989,28 @@ var VaultFolioPlugin = class extends import_obsidian3.Plugin {
         try {
           const result = await this.deploy();
           if (result.success) {
-            new import_obsidian3.Notice(`\u{1F680} Deployed! Visit: ${(_a = result.url) != null ? _a : result.message}`);
+            new import_obsidian5.Notice(`\u{1F680} Deployed! Visit: ${(_a = result.url) != null ? _a : result.message}`);
           } else {
             const msg = result.message;
             if (msg.includes("Invalid GitHub token") || msg.includes("401")) {
-              new import_obsidian3.Notice("\u274C Invalid GitHub token \u2014 regenerate in GitHub settings");
+              new import_obsidian5.Notice("\u274C Invalid GitHub token \u2014 regenerate in GitHub settings");
             } else {
-              new import_obsidian3.Notice("\u274C Deploy failed \u2014 check your GitHub token and repo");
+              new import_obsidian5.Notice("\u274C Deploy failed \u2014 check your GitHub token and repo");
             }
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network")) {
-            new import_obsidian3.Notice("\u274C Network error \u2014 check your connection");
+            new import_obsidian5.Notice("\u274C Network error \u2014 check your connection");
           } else {
-            new import_obsidian3.Notice(`\u274C Deploy failed \u2014 ${msg}`);
+            new import_obsidian5.Notice(`\u274C Deploy failed \u2014 ${msg}`);
           }
         }
       }
     });
     this.app.workspace.onLayoutReady(async () => {
       if (!this.settings.githubRepo) {
-        new import_obsidian3.Notice("\u{1F44B} Welcome to VaultFolio! Go to Settings \u2192 VaultFolio to get started.");
+        new import_obsidian5.Notice("\u{1F44B} Welcome to VaultFolio! Go to Settings \u2192 VaultFolio to get started.");
       }
       const notes = await this.parser.getPublishedNotes();
       console.log("Published notes found:", notes.length);
@@ -2733,7 +3025,8 @@ var VaultFolioPlugin = class extends import_obsidian3.Plugin {
     var _a, _b;
     const publishedNotes = await getPublishedNotes(
       this.app,
-      this.settings.portfolioFolder
+      this.settings.portfolioFolder,
+      this.settings.coverProperty
     );
     const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path, n.frontmatter));
     const result = buildSite(siteNotes, this.settings);

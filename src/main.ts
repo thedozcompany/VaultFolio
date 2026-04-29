@@ -103,7 +103,8 @@ export default class VaultFolioPlugin extends Plugin {
   async buildSite(): Promise<BuildResult> {
     const publishedNotes = await getPublishedNotes(
       this.app,
-      this.settings.portfolioFolder
+      this.settings.portfolioFolder,
+      this.settings.coverProperty
     );
     const siteNotes = publishedNotes.map((n) => parseNote(n.content, n.path, n.frontmatter));
     const result = buildSite(siteNotes, this.settings);

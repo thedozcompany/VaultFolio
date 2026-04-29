@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#120829"/>
+      <stop offset="55%" stop-color="#2a1060"/>
+      <stop offset="100%" stop-color="#3d1578"/>
+    </linearGradient>
+    <linearGradient id="circle-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9333EA"/>
+      <stop offset="100%" stop-color="#6D28D9"/>
+    </linearGradient>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7" fill="none" stroke="#A78BFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" rx="14" fill="url(#bg-grad)"/>
+
+  <!-- Subtle watermark numbers -->
+  <text x="150"  y="185" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="140" font-weight="900" fill="white" fill-opacity="0.04">1</text>
+  <text x="450"  y="185" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="140" font-weight="900" fill="white" fill-opacity="0.04">2</text>
+  <text x="750"  y="185" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="140" font-weight="900" fill="white" fill-opacity="0.04">3</text>
+  <text x="1050" y="185" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="140" font-weight="900" fill="white" fill-opacity="0.04">4</text>
+
+  <!-- Curved arc connectors -->
+  <path d="M184,115 C242,74 358,74 406,115" fill="none" stroke="#A78BFA" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.5" marker-end="url(#arr)"/>
+  <path d="M484,115 C542,74 658,74 706,115" fill="none" stroke="#A78BFA" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.5" marker-end="url(#arr)"/>
+  <path d="M784,115 C842,74 958,74 1006,115" fill="none" stroke="#A78BFA" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.5" marker-end="url(#arr)"/>
+
+  <!-- ── STEP 1: Write a Note ── -->
+  <circle cx="150" cy="115" r="46" fill="#7C3AED" opacity="0.18"/>
+  <rect x="109" y="26" width="82" height="22" rx="11" fill="white" fill-opacity="0.1"/>
+  <text x="150" y="41" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="2" fill="white" fill-opacity="0.75">STEP 01</text>
+  <circle cx="150" cy="115" r="34" fill="url(#circle-grad)"/>
+  <g transform="translate(150,115)" fill="none" stroke="white" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-10,-16 H4 L13,-7 V16 H-10 Z"/>
+    <path d="M4,-16 V-7 H13"/>
+    <line x1="-5" y1="-1" x2="6" y2="-1"/>
+    <line x1="-5" y1="6" x2="6" y2="6"/>
+    <line x1="-5" y1="13" x2="1" y2="13"/>
+  </g>
+  <text x="150" y="180" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="17" font-weight="700" fill="white">Write a Note</text>
+  <text x="150" y="202" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#C4B5FD">In your Obsidian vault</text>
+
+  <!-- ── STEP 2: Click Publish ── -->
+  <circle cx="450" cy="115" r="46" fill="#7C3AED" opacity="0.18"/>
+  <rect x="409" y="26" width="82" height="22" rx="11" fill="white" fill-opacity="0.1"/>
+  <text x="450" y="41" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="2" fill="white" fill-opacity="0.75">STEP 02</text>
+  <circle cx="450" cy="115" r="34" fill="url(#circle-grad)"/>
+  <!-- Upload / publish arrow icon -->
+  <g transform="translate(450,115)">
+    <path d="M0,-15 L-8,-3 L-3,-3 L-3,15 L3,15 L3,-3 L8,-3 Z" fill="white"/>
+  </g>
+  <text x="450" y="180" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="17" font-weight="700" fill="white">Click Publish</text>
+  <text x="450" y="202" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#C4B5FD">One click in the sidebar</text>
+
+  <!-- ── STEP 3: Portfolio Goes Live ── -->
+  <circle cx="750" cy="115" r="46" fill="#7C3AED" opacity="0.18"/>
+  <rect x="709" y="26" width="82" height="22" rx="11" fill="white" fill-opacity="0.1"/>
+  <text x="750" y="41" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="2" fill="white" fill-opacity="0.75">STEP 03</text>
+  <circle cx="750" cy="115" r="34" fill="url(#circle-grad)"/>
+  <!-- Globe icon -->
+  <g transform="translate(750,115)" fill="none" stroke="white" stroke-width="2.1" stroke-linecap="round">
+    <circle cx="0" cy="0" r="16"/>
+    <ellipse cx="0" cy="0" rx="7" ry="16"/>
+    <line x1="-16" y1="0" x2="16" y2="0"/>
+    <path d="M-14,-7 Q0,-4 14,-7"/>
+    <path d="M-14,7 Q0,4 14,7"/>
+  </g>
+  <text x="750" y="180" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="17" font-weight="700" fill="white">Portfolio Goes Live</text>
+  <text x="750" y="202" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#C4B5FD">Deployed to GitHub Pages</text>
+
+  <!-- ── STEP 4: Share Your Link ── -->
+  <circle cx="1050" cy="115" r="46" fill="#7C3AED" opacity="0.18"/>
+  <rect x="1009" y="26" width="82" height="22" rx="11" fill="white" fill-opacity="0.1"/>
+  <text x="1050" y="41" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" letter-spacing="2" fill="white" fill-opacity="0.75">STEP 04</text>
+  <circle cx="1050" cy="115" r="34" fill="url(#circle-grad)"/>
+  <!-- Share / network icon -->
+  <g transform="translate(1050,115)">
+    <circle cx="11"  cy="-12" r="4.5" fill="white"/>
+    <circle cx="-12" cy="0"   r="4.5" fill="white"/>
+    <circle cx="11"  cy="12"  r="4.5" fill="white"/>
+    <line x1="6.5" y1="-9.5" x2="-7.5" y2="-2.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="-7.5" y1="2.5" x2="6.5" y2="9.5"   stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <text x="1050" y="180" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="17" font-weight="700" fill="white">Share Your Link</text>
+  <text x="1050" y="202" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#C4B5FD">Send it anywhere</text>
+</svg>
