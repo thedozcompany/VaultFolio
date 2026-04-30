@@ -274,7 +274,8 @@ VaultFolio is in active beta. Founding user spots available.
   Example: [Become a Founding User →](https://gumroad.com/l/vaultfolio)
 -->
 
-[Join Beta / Give Feedback →](https://github.com/thedozcompany/VaultFolio/issues)
+[Join Beta ](https://github.com/thedozcompany/VaultFolio/issues)
+[Submit feedback](https://docs.google.com/forms/d/1m98Oxr8dahNzBtPADmx3T_pS_JePB4MczN3vfkgK00c/edit)
 
 ---
 
